@@ -163,7 +163,7 @@ func finishTxOnErr(tx *pg.Tx, err error) error {
 	}
 
 	if er != nil {
-		err = fmt.Errorf("failed to finish transation er=%v: %w", er, err)
+		err = fmt.Errorf("failed to finish transaction er=%v: %w", er, err)
 	}
 
 	return err
@@ -309,7 +309,7 @@ func (m *Migrator) dryRunMigrations(ctx context.Context, mm Migrations, chCurren
 
 func alwaysRollbackTx(tx *pg.Tx, err error) error {
 	if er := tx.Rollback(); er != nil {
-		err = fmt.Errorf("failed to finish transation er=%v: %w", er, err)
+		err = fmt.Errorf("failed to finish transaction er=%v: %w", er, err)
 	}
 
 	return err
