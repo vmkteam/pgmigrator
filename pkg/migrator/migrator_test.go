@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/go-pg/pg/v10"
 	. "github.com/smartystreets/goconvey/convey"
@@ -221,15 +220,7 @@ func execRun(ctx context.Context, t *testing.T) error {
 	}
 
 	ch := make(chan string)
-	go func() {
-		now := time.Now()
-		for x := range ch {
-			t.Log(x)
-			t.Logf("done in %v", time.Since(now))
-			now = time.Now()
-		}
-		t.Logf("done in %v", time.Since(now))
-	}()
+	go readFromCh(ch, t)
 
 	return testMigrator.Run(ctx, filenames, ch)
 }
@@ -270,7 +261,10 @@ func TestMigrator_Redo(t *testing.T) {
 			err := recreateSchema()
 			So(err, ShouldBeNil)
 
-			pm, err := execRedo(ctx, t)
+			ch := make(chan string)
+			go readFromCh(ch, t)
+
+			pm, err := testMigrator.Redo(ctx, ch)
 			So(err.Error(), ShouldEqual, "applied migrations were not found")
 			So(pm, ShouldBeNil)
 		})
@@ -284,7 +278,10 @@ func TestMigrator_Redo(t *testing.T) {
 			_, err = testDb.Exec("DROP TABLE tags CASCADE;")
 			So(err, ShouldBeNil)
 
-			pm, err := execRedo(ctx, t)
+			ch := make(chan string)
+			go readFromCh(ch, t)
+
+			pm, err := testMigrator.Redo(ctx, ch)
 			So(err, ShouldBeNil)
 			So(pm, ShouldResemble, &PgMigration{
 				ID:            pm.ID,
@@ -296,21 +293,6 @@ func TestMigrator_Redo(t *testing.T) {
 			})
 		})
 	})
-}
-
-func execRedo(ctx context.Context, t *testing.T) (*PgMigration, error) {
-	ch := make(chan string)
-	go func() {
-		now := time.Now()
-		for x := range ch {
-			t.Log(x)
-			t.Logf("done in %v", time.Since(now))
-			now = time.Now()
-		}
-		t.Logf("done in %v", time.Since(now))
-	}()
-
-	return testMigrator.Redo(ctx, ch)
 }
 
 func TestMigrator_dryRunMigrations(t *testing.T) {
@@ -328,24 +310,11 @@ func TestMigrator_dryRunMigrations(t *testing.T) {
 		mm, err := testMigrator.newMigrations(dirFiles)
 		So(err, ShouldBeNil)
 
-		err = execDryRunMigrations(ctx, mm, t)
+		ch := make(chan string)
+		go readFromCh(ch, t)
+		err = testMigrator.dryRunMigrations(ctx, mm, ch)
 		So(err, ShouldBeNil)
 	})
-}
-
-func execDryRunMigrations(ctx context.Context, mm []Migration, t *testing.T) error {
-	ch := make(chan string)
-	go func() {
-		now := time.Now()
-		for x := range ch {
-			t.Log(x)
-			t.Logf("done in %v", time.Since(now))
-			now = time.Now()
-		}
-		t.Logf("done in %v", time.Since(now))
-	}()
-
-	return testMigrator.dryRunMigrations(ctx, mm, ch)
 }
 
 func TestMigrator_DryRun(t *testing.T) {
@@ -360,7 +329,10 @@ func TestMigrator_DryRun(t *testing.T) {
 				"2022-12-12-02-create-table-news.sql",
 			}
 
-			err = execDryRun(ctx, dirFiles, t)
+			ch := make(chan string)
+			go readFromCh(ch, t)
+
+			err = testMigrator.DryRun(ctx, dirFiles, ch)
 			So(err, ShouldBeNil)
 		})
 
@@ -375,25 +347,13 @@ func TestMigrator_DryRun(t *testing.T) {
 				"2022-12-13-02-create-tags-table.sql",
 			}
 
-			err = execDryRun(ctx, dirFiles, t)
+			ch := make(chan string)
+			go readFromCh(ch, t)
+
+			err = testMigrator.DryRun(ctx, dirFiles, ch)
 			So(err.Error(), ShouldEqual, `non transactional migration found "2022-12-12-03-add-comments-news-NONTR.sql", run all migrations before it, please`)
 		})
 	})
-}
-
-func execDryRun(ctx context.Context, filenames []string, t *testing.T) error {
-	ch := make(chan string)
-	go func() {
-		now := time.Now()
-		for x := range ch {
-			t.Log(x)
-			t.Logf("done in %v", time.Since(now))
-			now = time.Now()
-		}
-		t.Logf("done in %v", time.Since(now))
-	}()
-
-	return testMigrator.DryRun(ctx, filenames, ch)
 }
 
 func TestMigrator_compareMD5Sum(t *testing.T) {
@@ -487,6 +447,12 @@ func TestMigrator_Verify(t *testing.T) {
 			So(invalid[0].Filename, ShouldEqual, invalidFilename)
 		})
 	})
+}
+
+func readFromCh(ch chan string, t *testing.T) {
+	for x := range ch {
+		t.Log(x)
+	}
 }
 
 func recreateSchema() error {
