@@ -1,57 +1,59 @@
-# pgmigrator
+# pgmigrator: command-line tool for PostgreSQL migrations.
 
+[![Release](https://img.shields.io/github/release/vmkteam/pgmigrator.svg)](https://github.com/vmkteam/pgmigrator/releases/latest)
+[![Build Status](https://github.com/vmkteam/pgmigrator/actions/workflows/go.yml/badge.svg?branch=master)](https://github.com/vmkteam/pgmigrator/actions)
+[![Linter Status](https://github.com/vmkteam/pgmigrator/actions/workflows/golangci-lint.yml/badge.svg?branch=master)](https://github.com/vmkteam/pgmigrator/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/vmkteam/pgmigrator)](https://goreportcard.com/report/github.com/vmkteam/pgmigrator)
+[![codecov](https://codecov.io/gh/vmkteam/pgmigrator/branch/master/graph/badge.svg)](https://codecov.io/gh/vmkteam/pgmigrator)
 
-pgmigrator очень простая утилита, предназначенная для накатывания инкрементальных (up only) миграций только для PostgreSQL.
+pgmigrator is a very simple utility designed to roll up incremental (up only) migrations for PostgreSQL only.
 
-* Понятный инструмент для локальной разработки и стейджа, на проде - AS IS.
-* Поддержка Ctrl+C - ROLLBACK текущией миграции, выход.
+Goal: to make an understandable tool for local development and stage environments.
 
-Ограничения
+Limitations
 --
-* База: PostgeSQL
-* Формат файла: `YYYY-MM-DDD-<description>.sql` / `YYYY-MM-DD-<description>-NONTR.sql` 
-* Типы миграций: только UP
-* Алгоритм: накатываем отсортированные файлы, которые есть в папке и подходят по формату файла, кроме того, что есть уже в базе
-* Программа работает только с конфигурационным файлом, расположенным в папке с миграциями.
+* Database: PostgeSQL
+* File format: `YYYYY-MM-DDD-<description>.sql` / `YYYYY-MM-DD-<description>-NONTR.sql`
+* Migration types: UP only
+* Algorithm: run sorted files that are in the folder and fit the file format, except for what is already in the database
+* The program works only with the configuration file located in the folder with migrations.
 
 
 FAQ
 --
-Q: Почему только up миграции?<br>
-A: В разработке мы почти никогда не пишем down миграции, потому что это бесполезно в 99% случаях. Если что-то пошло не так, то мы просто не накатываем или решаем вручную, что делать.
+Q: Why only up migrations?<br>
+A: In development, we almost never write down migrations because it's useless in 99% of cases. If something goes wrong, we just don't roll up or decide manually what to do.
 
-Q: Почему только PostgreSQL?<br>
-A: Есть цель создать узкоспециализированный простой инструмент для миграций.
+Q: Why only PostgreSQL? <br>
+A: There is a goal to create a highly specialized simple tool for migrations.
 
-Q: Почему такой ретроградный формат файла, а не общепризнанный `V<Version>_<description>.sql`?<br>
-A: Так исторически сложилось. Дата в файле дает больше прозрачности, чем номер версии. Меньше конфликтов при разработке в ветке.<br>
-Есть возможность переопределить этот параметр через конфиг._
+Q: Why such a specific file format rather than the generally recognized one `V<Version>_<description>.sql`?<br>
+A: This is historically the case. The date in the file gives more transparency than the version number. Less development conflicts in the branch.<br>
+_It is possible to override this parameter through the config._
 
+Q: Why not as a library? Why migrations specifically as files on disk?
+A: The goal is a simple utility that works with files. Alternatives in the form of libraries have already been written here https://awesome-go.com/#database-schema-migration
 
-Q: Почему нет в виде библиотеки? Почему миграции именно в виде файлов на диске?<br>
-A: Цель - простая утилита, которая работает с файлами. Альтернативы в виде библиотек уже написаны https://awesome-go.com/#database-schema-migration
-
-
-
-Миграции
+Migrations
 --
-Миграции расположены в папке. Подпапки не учитываются. Файлы отсортированы по имени.
-Все занесенные миграции записываются в таблицу (по умолчанию `public.pgMigrations`)
-Формат файла `YYYY-MM-DDD-<description>.sql`
+Migrations are located in a folder. Subfolders are not counted. Files are sorted by name.
+All recorded migrations are written to a table (by default `public.pgMigrations`)
+File format is `YYYYY-MM-DDD-<description>.sql`.
 
-Все миграции запускаются в отедльной транзакции с определенным StatementTimeout в конфиге.
-Нетранзакционные миграции имеют следующий формат `YYYY-MM-DD-<description>-NONTR.sql` (например, для create index concurrently).
+All migrations are started in a separate transaction with a specific StatementTimeout in the config. If not specified, it is not used.
+Non-transactional migrations have the following format `YYYYY-MM-DD-<description>-NONTR.sql` (e.g. for create index concurrently).
 
-Можно переопределить маску файла через конфиг. Если не указана - используется дефолтная.
-Если в названии файла есть `MANUAL`, то такая миграция игнорируется.
+You can override the file mask through the config. If not specified, the default one is used.
+If there is `MANUAL` at the end of the file name, such migration is ignored.
 
-	2020 // папка, не учитывается
-	pgmigrator.toml // обязательный конфиг файл
-	2021-04-12-create-table-commentTranslations.sql
-	2021-06-02-make-person-alias-not-null-NONTR.sql
-	2021-06-03-make-person-alias-not-null-MANUAL.sql // игнорируется
+        2020 // folder, not counted
+        pgmigrator.toml // mandatory config file
+        2021-04-12-create-table-commentTranslations.sql
+        2021-06-02-make-person-alias-not-null-NONTR.sql
+        2021-06-03-make-person-alias-not-null-MANUAL.sql // ignored
 
-Конфиг файл
+
+Configuration file
 --
 	[App]
 	Table = "public.pgMigrations"
@@ -66,127 +68,100 @@ A: Цель - простая утилита, которая работает с 
 	PoolSize = 1
 	ApplicationName = "pgmigrator"
 
-Запуск
+Run
 --
-	pgmigrator OPTIONS COMMNAD [args]
-		OPTIONS:
-			-c config file (default pgmigrator.toml)
-			-v show sql
+	Applies PostgreSQL migrations
+	
+	Usage:
+	pgmigrator [command]
+	
+	Available Commands:
+	completion  Generate the autocompletion script for the specified shell
+	create      Creates default config file pgmigrator.toml in current dir
+	dryrun      Tries to apply migrations. Runs migrations inside single transaction and always rollbacks it
+	help        Help about any command
+	last        Shows recent migrations from db
+	plan        Shows migration files which can be applied
+	redo        Rerun last migration
+	run         Run to apply migrations
+	verify      Checks and shows invalid migrations
+	
+	Flags:
+	--config string   config file (default "pgmigrator.toml")
+	-h, --help            help for pgmigrator
+	
+	Use "pgmigrator [command] --help" for more information about a command.
 
-		COMMAND:
-			plan   - show pending migrations
-			run    - run in db
-			dryrun - (begin rollback, check nontr)
-			last   - show last transactions, default number is 5
-			create - create config file
+Any command supports an argument in the form of a number. For `last` it is the number of last migrations (default is 5). For all others - the number of the file from `plan` to which to apply migrations. If no argument is passed, there are no restrictions (or default ones are used).
 
-		Args: 
-			[max file number from plan] for plan/run/dryrun
-			[top X] from last
+The base directory for migrations is the one where the config file is located.
+That is, you can call `pgmigrator --config docs/patches/pgmigrator.toml plan` and it will take all migrations from the `docs/patches` folder.
 
-Любая команда поддерживает аргумент в виде числа. Для `last` - это количество последних транзакций (по умолчанию 5). Для всех остальных – номер файла из `plan`, до которого применять миграции. Если аргумент не передан, то ограничений нет (или используются дефолтные).
-
-Базовая директория для миграций - та, в которой расположен конфиг файл.
-То есть можно вызвать `pgmigrator -c docs/patches/pgmigrator.toml plan` - и он возьмет все миграции из папки `docs/patches`.  
+## Commands
 
 ### Plan
 
-Алгоритм:
+Algorithm:
 
-* получить список файлов, отсортированный по имени
-* законнектится к бд
-	- проверить, есть ли таблица
-	- получить список миграций из базы
-* отобразить список файлов, которые надо применить (подсветить DROP?)
+* get a list of files sorted by name
+* connect to the database
+    - check if there is a table
+    - get the list of migrations from the database
+* display the list of files to be applied
 
-Вывод 
 
-	Planning to apply Х migrations:
-		1 - 2022-07-18-movieComments.sql
-		2 - 2022-07-28-jwlinks.sql
-		3 - 2022-07-30-compilations-fix.sql 
-	
 ### Run
 
-	создаем таблицу, если нужно
-	строим план
-	для каждого файла
-		если миграция обычная
-		begin
-			выполняем миграцию
-			добавляем запись о выполненой миграции
-		commit
-
-		если миграция non transactional
-			добавляем запись о миграции
-			выполняем миграцию
-			обновляем запись о миграции
-
-		если что-то идет не так - то rollback и выход (кроме nontr, так как не понятно, что именно произошло.)
-
-Вывод 
-
-	Planning to apply Х migrations:
-		1 - 2022-07-18-movieComments.sql
-		2 - 2022-07-28-jwlinks.sql
-		3 - 2022-07-30-compilations-fix.sql 
-
-	Applying:
-		1 - 2022-07-18-movieComments.sql ... done in 2s 
-		2 - 2022-07-28-jwlinks.sql ... done in 3m
-		3 - 2022-07-30-compilations-fix.sql ... 		
-	ERROR: <error text>
-
+    create a table, if necessary
+    make a plan
+    for each file.
+        if the migration is regular
+        begin
+            perform migration
+            add a record of the completed migration
+        commit
+    
+        if migration is non-transactional
+            add migration record
+            perform migration
+            update migration record
+    
+        if something goes wrong - rollback and exit (except for nontr, since it is not clear what exactly happened).
 ### DryRun
 
-* Как пункт Run, только открываем одну большую транзакцию и используем ROLLBACK.
-* если есть NONTR – не даем запустить dryrun (только до определнного имени файла)
-* Игнорируем StatementTimeout
-
-Вывод: как в Run, только в конце выводим сообщение о ROLLBACK.
+* Like Run, but open one big transaction and use ROLLBACK.
+* If there is a NONTR - do not let dryrun run (only up to a certain filename)
+* Ignore StatementTimeout
 
 ### Last
 
-Показываем последние транзакции.
+Shows the latest database migrations from a table.
 
-Вывод
+### Verify
 
-		Showing last migrations in public.pgMigrations:
-		34 - 2022-08-30 22:25:03 (ERR) 	 > 2022-07-30-compilations-NONTR.sql
-		33 - 2022-08-30 22:25:03 (3s)  	 > 2022-07-30-compilations-fix.sql
-		32 - 2022-08-30 22:25:34 (1s)    > 2022-07-28-jwlinks.sql
-		31 - 2022-08-30 22:23:12 (5m 4s) > 2022-07-18-movieComments.sql
+Checks patch integrity in the database and locally by md5 hash.
 
+### Create
 
-Модель базы
+Creates a new configuration file.
+
+### Redo
+
+Perform again the last migration that is recorded in the table.
+
+Database model
 -- 
-По умолчанию: таблица `pgMigrations`, схема `public`. 
-Рекомендуется иметь для каждой схемы свою таблицу миграций.
+Default: table `pgMigrations`, scheme `public`.
+It is recommended to have a different migrations table for each schema.
 
-* id (pk) – serial 
-* filename (unique) - имя файла
-* startedAt - дата запуска транзакции
-* finishedAt - дата завершения транзакции
-* transactional bool - флаг транзакционнности (false для NONTR) 
-* md5sum - хеш сумма файла
-
-
-Процесс внедрения
---
-
-1. Переносим все старые файлы в папке `docs/patches` в `2022`.
-2. Оставляем только новые патчи.
-3. Создаем конфиг файл, применяем патч через новый инструмент.
-
-У каждого проекта своя схема, в ней своя таблица с pgMigrations.
-
-При апдейте из гита можно вызвать `pgmigrator plan` из `docs/patches` и посмотреть новые патчи.
-Внедрять можно на любой стадии проекта.
-
-### CI/CD
-
-Предполагается, что будет собран единый контейнер из pgmigrator вместе с SQL файлами. 
-
-* Через артефакты прокидываем папку c sql файлами `docs/patches/*.sql` (если нужно)
-* Собираем образ из `pgmigrator` вместе с этими файлами, отправляем в репозиторий
-* Запускаем вручную отдельную джобу с pgmigrator последней версии, прокидываем конфиг.
+    create table if not exists "pgMigrations"
+    (
+        id            serial                    not null,
+        filename      text                      not null,
+        "startedAt"   timestamptz default now() not null,
+        "finishedAt"  timestamptz,
+        transactional bool        default true  not null,
+        md5sum        varchar(32)               not null,
+        primary key ("id"),
+        unique ("filename")
+    );

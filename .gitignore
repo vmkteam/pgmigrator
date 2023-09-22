@@ -1,0 +1,5 @@
+/pgmigrator
+/pgmigrator.toml
+/pkg/migrator/testdata/pgmigrator.toml
+/vendor
+.idea
