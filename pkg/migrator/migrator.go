@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-pg/pg/v10"
+	"github.com/go-pg/pg/v10/orm"
 )
 
 type Migrator struct {
@@ -20,11 +21,17 @@ type Migrator struct {
 }
 
 func NewMigrator(db *pg.DB, cfg Config, rootDir string) *Migrator {
-	return &Migrator{
-		db:      db.WithParam("migrationTable", pg.Ident(cfg.Table)),
+	m := &Migrator{
+		db:      db,
 		cfg:     cfg,
 		rootDir: rootDir,
 	}
+
+	if db != nil {
+		m.db = db.WithParam("migrationTable", pg.Ident(cfg.Table))
+	}
+
+	return m
 }
 
 // readAllFiles read files from migrator root dir and return its filenames
@@ -85,6 +92,8 @@ func (m *Migrator) Plan(ctx context.Context) ([]string, error) {
 	filenames, err := m.readAllFiles()
 	if err != nil {
 		return nil, err
+	} else if len(filenames) == 0 {
+		return nil, nil
 	}
 
 	// fetch completed migrations from db
@@ -172,6 +181,10 @@ func (m *Migrator) applyMigration(ctx context.Context, mg Migration) (err error)
 		err = finishTxOnErr(tx, err)
 	}()
 
+	if err = m.setStatementTimeout(ctx, tx); err != nil {
+		return err
+	}
+
 	// run
 	start := time.Now()
 	if _, err = tx.ExecContext(ctx, string(mg.Data)); err != nil {
@@ -191,8 +204,24 @@ func (m *Migrator) applyMigration(ctx context.Context, mg Migration) (err error)
 	return nil
 }
 
+// setStatementTimeout set statement timeout to transaction connection
+func (m *Migrator) setStatementTimeout(ctx context.Context, tx orm.DB) error {
+	if m.cfg.StatementTimeout == "" {
+		return nil
+	}
+
+	if _, err := tx.ExecContext(ctx, `set statement_timeout to ?`, m.cfg.StatementTimeout); err != nil {
+		return fmt.Errorf(`set statement timeout failed: %w`, err)
+	}
+
+	return nil
+}
+
 // applyNonTransactionalMigration apply non-transactional migration
 func (m *Migrator) applyNonTransactionalMigration(ctx context.Context, mg Migration) error {
+	if err := m.setStatementTimeout(ctx, m.db); err != nil {
+		return err
+	}
 	// insert into pgMigrations
 	pm := mg.ToDB()
 	pm.StartedAt = time.Now()
@@ -218,6 +247,8 @@ func (m *Migrator) applyNonTransactionalMigration(ctx context.Context, mg Migrat
 // DryRun tries to apply migrations. Runs migrations inside single transaction and always rolls back it
 // returns err, if apply done with error or if non-transactional migration was found
 func (m *Migrator) DryRun(ctx context.Context, filenames []string, chCurrentFile chan string) error {
+	defer close(chCurrentFile)
+
 	// create migration table if not exists
 	if err := m.createMigratorTable(ctx); err != nil {
 		return err
@@ -338,6 +369,7 @@ func (m *Migrator) compareMD5Sum(all, completed []PgMigration) (res []PgMigratio
 
 	for _, f := range completed {
 		if sum := allMapping[f.Filename]; sum != f.Md5sum {
+			f.Md5sumLocal = sum
 			res = append(res, f)
 		}
 	}
@@ -356,7 +388,7 @@ func (m *Migrator) Redo(ctx context.Context, chCurrentFile chan string) (*PgMigr
 	var pm PgMigration
 	if err := m.db.ModelContext(ctx, &pm).Order(`id desc`).Limit(1).Select(); err != nil {
 		if errors.Is(err, pg.ErrNoRows) {
-			return nil, fmt.Errorf(`applied migrations not found`)
+			return nil, fmt.Errorf(`applied migrations were not found`)
 		}
 		return nil, fmt.Errorf(`fetch last migration failed: %w`, err)
 	}

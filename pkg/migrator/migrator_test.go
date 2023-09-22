@@ -14,7 +14,7 @@ var (
 	testDb       *pg.DB
 	testConfig   Config
 	testMigrator *Migrator
-	dbConn       = env("DB_CONN", "postgres://postgres:postgres@localhost:5432/newsportal?sslmode=disable")
+	dbConn       = env("DB_CONN", "postgres://postgres:postgres@localhost:5432/pgmigrator?sslmode=disable")
 )
 
 func env(v, def string) string {
@@ -271,7 +271,7 @@ func TestMigrator_Redo(t *testing.T) {
 			So(err, ShouldBeNil)
 
 			pm, err := execRedo(ctx, t)
-			So(err.Error(), ShouldEqual, "applied migrations not found")
+			So(err.Error(), ShouldEqual, "applied migrations were not found")
 			So(pm, ShouldBeNil)
 		})
 		Convey("redo last applied", func() {

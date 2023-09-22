@@ -20,7 +20,7 @@ func NewConfig(table string, statementTimeout string, fileMask string) *Config {
 }
 
 type PgMigration struct {
-	tableName struct{} `pg:"?migrationTable,alias:t,discard_unknown_columns"`
+	tableName struct{} `pg:"?migrationTable,alias:t,discard_unknown_columns"` //nolint:all
 
 	ID            int        `pg:"id,pk"`
 	Filename      string     `pg:"filename,use_zero"`
@@ -28,6 +28,7 @@ type PgMigration struct {
 	FinishedAt    *time.Time `pg:"finishedAt"`
 	Transactional bool       `pg:"transactional,use_zero"`
 	Md5sum        string     `pg:"md5sum,use_zero"`
+	Md5sumLocal   string     `pg:"-"`
 }
 
 type Migration struct {
