@@ -15,8 +15,12 @@ type Config struct {
 	FileMask         string
 }
 
-func NewConfig(table string, statementTimeout string, fileMask string) *Config {
-	return &Config{Table: table, StatementTimeout: statementTimeout, FileMask: fileMask}
+func NewDefaultConfig() Config {
+	return Config{
+		Table:            "public.pgMigrations",
+		StatementTimeout: "5s",
+		FileMask:         `\d{4}-\d{2}-\d{2}-\S+.sql`,
+	}
 }
 
 type PgMigration struct {

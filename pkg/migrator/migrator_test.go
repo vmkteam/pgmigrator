@@ -34,7 +34,7 @@ func NewTestDB() *pg.DB {
 
 func TestMain(m *testing.M) {
 	testDb = NewTestDB()
-	testConfig = testMigrator.NewConfig()
+	testConfig = NewDefaultConfig()
 	testMigrator = NewMigrator(testDb, testConfig, "testdata")
 	os.Exit(m.Run())
 }
