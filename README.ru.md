@@ -1,57 +1,61 @@
-# pgmigrator
+# pgmigrator: command-line tool for PostgreSQL migrations.
 
+[![Release](https://img.shields.io/github/release/vmkteam/pgmigrator.svg)](https://github.com/vmkteam/pgmigrator/releases/latest)
+[![Build Status](https://github.com/vmkteam/pgmigrator/actions/workflows/go.yml/badge.svg?branch=master)](https://github.com/vmkteam/pgmigrator/actions)
+[![Linter Status](https://github.com/vmkteam/pgmigrator/actions/workflows/golangci-lint.yml/badge.svg?branch=master)](https://github.com/vmkteam/pgmigrator/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/vmkteam/pgmigrator)](https://goreportcard.com/report/github.com/vmkteam/pgmigrator)
+[![codecov](https://codecov.io/gh/vmkteam/pgmigrator/branch/master/graph/badge.svg)](https://codecov.io/gh/vmkteam/pgmigrator)
 
 pgmigrator очень простая утилита, предназначенная для накатывания инкрементальных (up only) миграций только для PostgreSQL.
 
 * Понятный инструмент для локальной разработки и стейджа, на проде - AS IS.
-* Поддержка Ctrl+C - ROLLBACK текущией миграции, выход.
+* Поддержка Ctrl+C - ROLLBACK текущей миграции, выход.
 
 Ограничения
 --
-* База: PostgeSQL
-* Формат файла: `YYYY-MM-DDD-<description>.sql` / `YYYY-MM-DD-<description>-NONTR.sql` 
+* База: PostgreSQL
+* Маска файлов миграций: `YYYY-MM-DDD-<description>.sql` / `YYYY-MM-DD-<description>-NONTR.sql` 
 * Типы миграций: только UP
-* Алгоритм: накатываем отсортированные файлы, которые есть в папке и подходят по формату файла, кроме того, что есть уже в базе
+* Алгоритм: применяем к базе данных отсортированные файлы с миграциями, которые есть в папке и подходят по маске файла, кроме тех, которые уже применены к базе
 * Программа работает только с конфигурационным файлом, расположенным в папке с миграциями.
 
 
 FAQ
 --
 Q: Почему только up миграции?<br>
-A: В разработке мы почти никогда не пишем down миграции, потому что это бесполезно в 99% случаях. Если что-то пошло не так, то мы просто не накатываем или решаем вручную, что делать.
+A: В разработке мы почти никогда не пишем down миграции, потому что это бесполезно в 99% случаях. Если что-то пошло не так, то мы просто не накатываем миграцию или решаем вручную, что делать.
 
 Q: Почему только PostgreSQL?<br>
 A: Есть цель создать узкоспециализированный простой инструмент для миграций.
 
-Q: Почему такой ретроградный формат файла, а не общепризнанный `V<Version>_<description>.sql`?<br>
+Q: Почему такая специфическая маска файла, а не общепризнанный `V<Version>_<description>.sql`?<br>
 A: Так исторически сложилось. Дата в файле дает больше прозрачности, чем номер версии. Меньше конфликтов при разработке в ветке.<br>
-Есть возможность переопределить этот параметр через конфиг._
+_Есть возможность переопределить этот параметр через файл конфигурации._
 
-
-Q: Почему нет в виде библиотеки? Почему миграции именно в виде файлов на диске?<br>
+Q: Почему не в виде библиотеки? Почему миграции именно в виде файлов на диске?<br>
 A: Цель - простая утилита, которая работает с файлами. Альтернативы в виде библиотек уже написаны https://awesome-go.com/#database-schema-migration
 
 
 
 Миграции
 --
-Миграции расположены в папке. Подпапки не учитываются. Файлы отсортированы по имени.
+Файлы с миграциями расположены в папке. Подпапки не учитываются. Файлы отсортированы по имени.
 Все занесенные миграции записываются в таблицу (по умолчанию `public.pgMigrations`)
-Формат файла `YYYY-MM-DDD-<description>.sql`
+Маска файла по умолчанию: `YYYY-MM-DDD-<description>.sql`
 
-Все миграции запускаются в отдельной транзакции с определенным StatementTimeout в конфиге.
-Нетранзакционные миграции имеют следующий формат `YYYY-MM-DD-<description>-NONTR.sql` (например, для create index concurrently).
+Все миграции запускаются в отдельной транзакции с определенным StatementTimeout, определенном в файле конфигурации.
+Нетранзакционные миграции имеют следующую маску файла `YYYY-MM-DD-<description>-NONTR.sql` (например, для create index concurrently).
 
-Можно переопределить маску файла через конфиг. Если не указана - используется дефолтная.
-Если в названии файла есть `MANUAL`, то такая миграция игнорируется.
+Можно переопределить маску файла через файл конфигурации. Если маска не указана - используется маска по умолчанию.
+Если в имени файла есть `MANUAL`, то такая миграция игнорируется.
 
 	2020 // папка, не учитывается
-	pgmigrator.toml // обязательный конфиг файл
-	2021-04-12-create-table-commentTranslations.sql
-	2021-06-02-make-person-alias-not-null-NONTR.sql
+	pgmigrator.toml // обязательный файл конфигурации
+	2021-04-12-create-table-commentTranslations.sql // запускается внутри транзакции
+	2021-06-02-make-person-alias-not-null-NONTR.sql // запускается вне транзакции
 	2021-06-03-make-person-alias-not-null-MANUAL.sql // игнорируется
 
-Конфиг файл
+Файл конфигурации
 --
 	[App]
 	Table = "public.pgMigrations"
@@ -61,76 +65,76 @@ A: Цель - простая утилита, которая работает с 
 	[Database]
 	Addr     = "localhost:5432"
 	User     = "postgres"
-	Database = "testdb"
 	Password = "tesdb"
+	Database = "testdb"
 	PoolSize = 1
 	ApplicationName = "pgmigrator"
 
 Запуск
 --
-	Applies PostgreSQL migrations
-	
-	Usage:
-	pgmigrator [command]
-	
-	Available Commands:
-	completion  Generate the autocompletion script for the specified shell
-	create      Creates default config file pgmigrator.toml in current dir
-	dryrun      Tries to apply migrations. Runs migrations inside single transaction and always rollbacks it
-	help        Help about any command
-	last        Shows recent migrations from db
-	plan        Shows migration files which can be applied
-	redo        Rerun last migration
-	run         Run to apply migrations
-	verify      Checks and shows invalid migrations
-	
-	Flags:
-	--config string   config file (default "pgmigrator.toml")
-	-h, --help            help for pgmigrator
-	
-	Use "pgmigrator [command] --help" for more information about a command.
+    Command-line tool for PostgreSQL migrations
 
-Любая команда поддерживает аргумент в виде числа. Для `last` - это количество последних миграций (по умолчанию 5). Для всех остальных – номер файла из `plan`, до которого применять миграции. Если аргумент не передан, то ограничений нет (или используются дефолтные).
+    Usage:
+    pgmigrator [command]
+    
+    Available Commands:
+    completion  Generate the autocompletion script for the specified shell
+    dryrun      Tries to apply migrations. Runs migrations inside single transaction and always rollbacks it
+    help        Help about any command
+    init        Initialize default configuration file in current directory
+    last        Shows recent applied migrations from db
+    plan        Shows migration files which can be applied
+    redo        Rerun last applied migration from db
+    run         Applies all new migrations
+    verify      Checks and shows invalid migrations
+    
+    Flags:
+    -c, --config string   configuration file (default "pgmigrator.toml")
+    -h, --help            help for pgmigrator
+    -v, --version         version for pgmigrator
+    
+    Use "pgmigrator [command] --help" for more information about a command.
 
-Базовая директория для миграций - та, в которой расположен конфиг файл.
+Любая команда поддерживает аргумент в виде числа. Для `last` - это количество последних миграций (по умолчанию 5). Для всех остальных – номер файла из `plan`, до которого применять миграции. Если аргумент не передан, то ограничений нет (или используется значение по умолчанию).
+
+Базовая директория для миграций - та, в которой расположен файл конфигурации.
 То есть можно вызвать `pgmigrator --config docs/patches/pgmigrator.toml plan` - и он возьмет все миграции из папки `docs/patches`.  
 
 ### Plan
 
-Алгоритм:
-
-* получить список файлов, отсортированный по имени
+**Алгоритм**
+* получить список файлов миграций, отсортированный по имени
 * подключиться к бд
 	- проверить, есть ли таблица
 	- получить список миграций из базы
-* отобразить список файлов, которые надо применить (подсветить DROP?)
+* отобразить список файлов миграций, которые надо применить (TODO: подсветить DROP?)
 
-Вывод 
+**Вывод** 
 
 	Planning to apply Х migrations:
 		1 - 2022-07-18-movieComments.sql
 		2 - 2022-07-28-jwlinks.sql
 		3 - 2022-07-30-compilations-fix.sql 
-	
+
 ### Run
 
-	создаем таблицу, если нужно
-	строим план
-	для каждого файла
-		если миграция обычная
-		begin
-			выполняем миграцию
-			добавляем запись о выполненой миграции
-		commit
+**Алгоритм**
 
-		если миграция non transactional
-			добавляем запись о миграции
-			выполняем миграцию
-			обновляем запись о миграции
+* создаем таблицу, если нужно
+* строим план
+* для каждого файла миграции
+  - если миграция обычная:
+    - begin
+      - выполняем миграцию
+      - добавляем запись в бд о выполненной миграции
+    - commit
+  - если миграция non transactional:
+    - добавляем запись о миграции
+    - выполняем миграцию
+    - обновляем запись о миграции
+  - если что-то идет не так - то транзакция откатывается (ROLLBACK) и программа завершается (кроме nontr, так как не понятно, что именно произошло)
 
-		если что-то идет не так - то rollback и выход (кроме nontr, так как не понятно, что именно произошло.)
-
-Вывод 
+**Вывод** 
 
 	Planning to apply Х migrations:
 		1 - 2022-07-18-movieComments.sql
@@ -145,17 +149,19 @@ A: Цель - простая утилита, которая работает с 
 
 ### DryRun
 
-* Как пункт Run, только открываем одну большую транзакцию и используем ROLLBACK.
-* если есть NONTR – не даем запустить dryrun (только до определнного имени файла)
-* Игнорируем StatementTimeout
+* Как пункт `Run`, только открываем одну большую транзакцию и используем ROLLBACK.
+* если в имени файла миграции есть суффикс NONTR – не даем запустить dryrun (только до определенного имени файла)
+* Настройка `StatementTimeout` игнорируется 
 
-Вывод: как в Run, только в конце выводим сообщение о ROLLBACK.
+**Вывод**
+
+Как в `Run`, только в конце выводим сообщение о ROLLBACK.
 
 ### Last
 
 Показываем последние транзакции.
 
-Вывод
+**Вывод**
 
 		Showing last migrations in public.pgMigrations:
 		34 - 2022-08-30 22:25:03 (ERR) 	 > 2022-07-30-compilations-NONTR.sql
@@ -163,36 +169,56 @@ A: Цель - простая утилита, которая работает с 
 		32 - 2022-08-30 22:25:34 (1s)    > 2022-07-28-jwlinks.sql
 		31 - 2022-08-30 22:23:12 (5m 4s) > 2022-07-18-movieComments.sql
 
+### Verify
+
+Проверяет целостность файлов миграций в базе данных и локально по md5 хешу.
+
+### Init
+
+Инициализирует новый файл конфигурации с параметрами по умолчанию.
+
+### Redo
+
+Выполняет еще раз последнюю миграцию, записанную в таблице миграций в бд.
 
 Модель базы
--- 
-По умолчанию: таблица `pgMigrations`, схема `public`. 
+--
+По умолчанию: список примененных миграций хранится в таблице `pgMigrations`, схема `public`.<br>
 Рекомендуется иметь для каждой схемы свою таблицу миграций.
 
-* id (pk) – serial 
-* filename (unique) - имя файла
-* startedAt - дата запуска транзакции
-* finishedAt - дата завершения транзакции
-* transactional bool - флаг транзакционнности (false для NONTR) 
-* md5sum - хеш сумма файла
+    create table if not exists "pgMigrations"
+    (
+        id            serial                    not null,
+        filename      text                      not null,
+        "startedAt"   timestamptz default now() not null,
+        "finishedAt"  timestamptz,
+        transactional bool        default true  not null,
+        md5sum        varchar(32)               not null,
+        primary key ("id"),
+        unique ("filename")
+    );
+
+* id (pk) – serial
+* filename - уникальное имя файла миграции
+* startedAt - дата запуска миграции
+* finishedAt - дата завершения миграции
+* transactional - флаг транзакционности (false для NONTR)
+* md5sum - хеш сумма файла миграции
 
 
 Процесс внедрения
 --
 
-1. Переносим все старые файлы в папке `docs/patches` в `2022`.
+1. Переносим все старые файлы миграций в отдельную папку (или подпапку).
 2. Оставляем только новые патчи.
-3. Создаем конфиг файл, применяем патч через новый инструмент.
+3. Создаем файл конфигурации (команда `pgmigrator init`) и модифицируем если это необходимо.
+4. Применяем патчи через новый инструмент.
 
 У каждого проекта своя схема, в ней своя таблица с pgMigrations.
 
-При апдейте из гита можно вызвать `pgmigrator plan` из `docs/patches` и посмотреть новые патчи.
+При обновлении из гита можно вызвать `pgmigrator plan` из `docs/patches` и посмотреть новые патчи.
 Внедрять можно на любой стадии проекта.
 
-### CI/CD
-
-Предполагается, что будет собран единый контейнер из pgmigrator вместе с SQL файлами. 
-
-* Через артефакты прокидываем папку c sql файлами `docs/patches/*.sql` (если нужно)
-* Собираем образ из `pgmigrator` вместе с этими файлами, отправляем в репозиторий
-* Запускаем вручную отдельную джобу с pgmigrator последней версии, прокидываем конфиг.
+### Docker образы
+- [Docker Hub](https://hub.docker.com/vmkteam/pgmigrator)
+- Вкладка Packages в этом репозитории

@@ -407,14 +407,6 @@ func (m *Migrator) Redo(ctx context.Context, chCurrentFile chan string) (*PgMigr
 	return &pm, m.Run(ctx, []string{pm.Filename}, chCurrentFile)
 }
 
-func (*Migrator) NewConfig() Config {
-	return Config{
-		Table:            "public.pgMigrations",
-		StatementTimeout: "5s",
-		FileMask:         `\d{4}-\d{2}-\d{2}-\S+.sql`,
-	}
-}
-
 // createMigratorTable create if not exists migration table
 func (m *Migrator) createMigratorTable(ctx context.Context) error {
 	_, err := m.db.ExecContext(ctx, `

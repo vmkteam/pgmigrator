@@ -3,7 +3,6 @@ package app
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -35,37 +34,43 @@ type Config struct {
 type App struct {
 	rootCmd *cobra.Command
 	mg      *migrator.Migrator
-	dbc     *pg.DB
 	cfg     Config
 }
 
-func New(rootCmd *cobra.Command, dbc *pg.DB, rootDir string, cfg Config) App {
+func New(rootCmd *cobra.Command, mg *migrator.Migrator, cfg Config) App {
 	return App{
 		rootCmd: rootCmd,
-		mg:      migrator.NewMigrator(dbc, cfg.App, rootDir),
+		mg:      mg,
 		cfg:     cfg,
-		dbc:     dbc,
 	}
 }
 
 func (a App) Run(ctx context.Context) error {
-	a.rootCmd.AddCommand(a.createCmd(), a.dryRunCmd(ctx), a.lastCmd(ctx), a.planCmd(ctx), a.redoCmd(ctx), a.runCmd(ctx), a.verifyCmd(ctx))
+	a.rootCmd.AddCommand(a.initCmd(), a.dryRunCmd(ctx), a.lastCmd(ctx), a.planCmd(ctx), a.redoCmd(ctx), a.runCmd(ctx), a.verifyCmd(ctx))
+	a.rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		if cmd.Name() == "init" || cmd.Name() == "help" {
+			return
+		}
+
+		if a.mg == nil {
+			log.Fatal("Configuration file was not found. Please create new via `pgmigrator init`")
+		}
+	}
 
 	return a.rootCmd.Execute()
 }
 
-// createCmd represents the create command.
-func (a App) createCmd() *cobra.Command {
+// initCmd represents the init command.
+func (a App) initCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "create",
-		Short: "Creates default config file " + DefaultConfigFile + " in current dir",
-		Long:  ``,
+		Use:   "init",
+		Short: "Initialize default configuration file in current directory",
+		Long:  `Initialize default configuration file in current directory. If -c flag passed, initialize file with this name`,
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg := Config{App: a.mg.NewConfig()}
 			var buf bytes.Buffer
 
 			enc := toml.NewEncoder(&buf)
-			if err := enc.Encode(cfg); err != nil {
+			if err := enc.Encode(migrator.NewDefaultConfig()); err != nil {
 				log.Fatalf("Failed to create file: %v", err)
 				return
 			}
@@ -75,11 +80,11 @@ func (a App) createCmd() *cobra.Command {
 [Database]
   Addr     = "localhost:5432"
   User     = "postgres"
-  Database = "pgmigrator"
   Password = ""
+  Database = "pgmigrator"
   PoolSize = 1
   ApplicationName = "pgmigrator"`)
-			if err := os.WriteFile(a.cfg.ConfigFile, buf.Bytes(), os.ModePerm); err != nil {
+			if err := os.WriteFile(a.cfg.ConfigFile, buf.Bytes(), 0644); err != nil {
 				log.Fatalf("Failed to write file %s: %v", a.cfg.ConfigFile, err)
 				return
 			}
@@ -92,14 +97,11 @@ func (a App) createCmd() *cobra.Command {
 // lastCmd represents the last command.
 func (a App) lastCmd(ctx context.Context) *cobra.Command {
 	return &cobra.Command{
-		Use:   "last",
-		Short: "Shows recent migrations from db",
-		Long:  ``,
+		Use:   "last [<count>]",
+		Short: "Shows recent applied migrations from db",
+		Long: `Shows recent applied migrations from db.
+If <count> applied, shows recent <count> applied migrations. By default: 5`,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := a.hasDB(ctx); err != nil {
-				log.Fatalf("DB connection error: %v", err)
-			}
-
 			// calculate count
 			cnt, err := count(args)
 			if err != nil {
@@ -134,10 +136,6 @@ func (a App) planCmd(ctx context.Context) *cobra.Command {
 		Short: "Shows migration files which can be applied",
 		Long:  ``,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := a.hasDB(ctx); err != nil {
-				log.Fatalf("DB connection error: %v", err)
-			}
-
 			mm, err := a.mg.Plan(ctx)
 			if err != nil {
 				log.Fatalf("Execute command failed: %v", err)
@@ -165,10 +163,6 @@ func (a App) verifyCmd(ctx context.Context) *cobra.Command {
 		Short: "Checks and shows invalid migrations",
 		Long:  ``,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := a.hasDB(ctx); err != nil {
-				log.Fatalf("DB connection error: %v", err)
-			}
-
 			mm, err := a.mg.Verify(ctx)
 			if err != nil {
 				log.Fatalf("Execute command error: %v", err)
@@ -192,14 +186,11 @@ func (a App) verifyCmd(ctx context.Context) *cobra.Command {
 // runCmd run to migrations.
 func (a App) runCmd(ctx context.Context) *cobra.Command {
 	return &cobra.Command{
-		Use:   "run",
-		Short: "Run to apply migrations",
-		Long:  ``,
+		Use:   "run [<count>]",
+		Short: "Applies all new migrations",
+		Long: `Applies all new migrations.
+If <count> applied, applies only <count> migrations from plan. By default: 5`,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := a.hasDB(ctx); err != nil {
-				log.Fatalf("DB connection error: %v", err)
-			}
-
 			// plan to apply
 			mm, err := a.mg.Plan(ctx)
 			if err != nil {
@@ -234,18 +225,11 @@ func (a App) runCmd(ctx context.Context) *cobra.Command {
 // dryRunCmd tries to apply migrations. Runs migrations inside single transaction and always rolllbacks it
 func (a App) dryRunCmd(ctx context.Context) *cobra.Command {
 	return &cobra.Command{
-		Use:   "dryrun",
+		Use:   "dryrun [<count>]",
 		Short: "Tries to apply migrations. Runs migrations inside single transaction and always rollbacks it",
-		Long:  ``,
+		Long: `Tries to apply migrations. Runs migrations inside single transaction and always rollbacks it.
+If <count> applied, runs only <count> migrations. By default: 5`,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := a.hasDB(ctx); err != nil {
-				log.Fatalf("DB connection error: %v", err)
-			}
-
-			if err := a.hasDB(ctx); err != nil {
-				log.Fatalf("DB connection error: %v", err)
-			}
-
 			// plan to apply
 			mm, err := a.mg.Plan(ctx)
 			if err != nil {
@@ -282,13 +266,9 @@ func (a App) dryRunCmd(ctx context.Context) *cobra.Command {
 func (a App) redoCmd(ctx context.Context) *cobra.Command {
 	return &cobra.Command{
 		Use:   "redo",
-		Short: "Rerun last migration",
+		Short: "Rerun last applied migration from db",
 		Long:  ``,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := a.hasDB(ctx); err != nil {
-				log.Fatalf("DB connection error: %v", err)
-			}
-
 			fmt.Println("Redo last migration:")
 			ch := make(chan string)
 			wg := &sync.WaitGroup{}
@@ -301,14 +281,6 @@ func (a App) redoCmd(ctx context.Context) *cobra.Command {
 			wg.Wait()
 		},
 	}
-}
-
-func (a App) hasDB(ctx context.Context) error {
-	if a.dbc == nil {
-		return errors.New("no db connection specified in config file. Run `pgmigrator create` for new config file")
-	}
-
-	return a.dbc.Ping(ctx)
 }
 
 func prepareTable(tbl table.Table) table.Table {
