@@ -46,7 +46,7 @@ func New(rootCmd *cobra.Command, mg *migrator.Migrator, cfg Config) App {
 }
 
 func (a App) Run(ctx context.Context) error {
-	a.rootCmd.AddCommand(a.initCmd(), a.dryRunCmd(ctx), a.lastCmd(ctx), a.planCmd(ctx), a.redoCmd(ctx), a.runCmd(ctx), a.verifyCmd(ctx))
+	a.rootCmd.AddCommand(a.initCmd(), a.dryRunCmd(ctx), a.lastCmd(ctx), a.planCmd(ctx), a.redoCmd(ctx), a.runCmd(ctx), a.verifyCmd(ctx), a.skipCmd(ctx))
 	a.rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		if cmd.Name() == "init" || cmd.Name() == "help" {
 			return
@@ -258,6 +258,46 @@ If <count> applied, runs only <count> migrations. By default: 5`,
 			}
 			wg.Wait()
 			fmt.Println("ROLLBACK")
+		},
+	}
+}
+
+// skipCmd marks migrations done without actually running them
+func (a App) skipCmd(ctx context.Context) *cobra.Command {
+	return &cobra.Command{
+		Use:   "skip [<count>]",
+		Short: "Marks migrations done without actually running them",
+		Long: `Marks migrations done without actually running them.
+If <count> applied, marks only first <count> migrations displayed in plan. Default <count> = 5.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			// get list of migrations
+			mm, err := a.mg.Plan(ctx)
+			if err != nil {
+				log.Fatalf("Execute command failed: %v\n", err)
+			} else if len(mm) == 0 {
+				fmt.Println("No new migrations were found.")
+				return
+			}
+
+			// calculate count
+			cnt, err := count(args)
+			if err != nil {
+				log.Fatal("invalid argument")
+			} else if cnt > len(mm) {
+				cnt = len(mm)
+			}
+
+			// skip migrations
+			ch := make(chan string)
+			wg := &sync.WaitGroup{}
+			go readCh(ch, wg)
+			fmt.Println("Skipping migrations...")
+			if err = a.mg.Skip(ctx, mm[:cnt], ch); err != nil {
+				log.Fatalf("Skip migration error: %v", err)
+				return
+			}
+			wg.Wait()
+			fmt.Println("Done")
 		},
 	}
 }

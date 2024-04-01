@@ -356,6 +356,50 @@ func TestMigrator_DryRun(t *testing.T) {
 	})
 }
 
+func TestMigrator_skipMigrations(t *testing.T) {
+	ctx := context.Background()
+	Convey("TestMigrator_skipMigrations", t, func() {
+		err := recreateSchema()
+		So(err, ShouldBeNil)
+		err = testMigrator.createMigratorTable(ctx)
+		So(err, ShouldBeNil)
+
+		dirFiles := []string{
+			"2022-12-12-01-create-table-statuses.sql",
+			"2022-12-12-02-create-table-news.sql",
+		}
+		mm, err := testMigrator.newMigrations(dirFiles)
+		So(err, ShouldBeNil)
+
+		ch := make(chan string)
+		go readFromCh(ch, t)
+		err = testMigrator.skipMigrations(ctx, mm, ch)
+		So(err, ShouldBeNil)
+
+		for _, mg := range mm {
+			var pm PgMigration
+			err = testMigrator.db.ModelContext(ctx, &pm).Where(`"filename" = ?`, mg.Filename).Select()
+			So(err, ShouldBeNil)
+			So(pm, ShouldNotBeNil)
+			So(pm.FinishedAt, ShouldNotBeEmpty)
+		}
+	})
+}
+
+func TestMigrator_Skip(t *testing.T) {
+	ctx := context.Background()
+	Convey("TestMigrator_Skip", t, func() {
+		err := recreateSchema()
+		So(err, ShouldBeNil)
+		filenames, err := testMigrator.Plan(ctx)
+		So(err, ShouldBeNil)
+		ch := make(chan string)
+		go readFromCh(ch, t)
+		err = testMigrator.Skip(ctx, filenames, ch)
+		So(err, ShouldBeNil)
+	})
+}
+
 func TestMigrator_compareMD5Sum(t *testing.T) {
 	Convey("TestMigrator_compareMD5Sum", t, func() {
 		Convey("check correct", func() {

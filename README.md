@@ -84,6 +84,7 @@ Run
     plan        Shows migration files which can be applied
     redo        Rerun last applied migration from db
     run         Applies all new migrations
+    skip        Marks migrations done without actually running them.
     verify      Checks and shows invalid migrations
     
     Flags:
@@ -155,17 +156,21 @@ That is, you can call `pgmigrator --config docs/patches/pgmigrator.toml plan` an
 * If there is a NONTR - do not let dryrun run (only up to a certain filename)
 * `StatementTimeout` setting is ignored
 
+### Skip
+
+Like `Run`, but without actually running sql migration, only adding migration success record
+
 ### Last
 
 Shows the latest database migrations from a table.
 
 **Output**
 
-		Showing last migrations in public.pgMigrations:
-		34 - 2022-08-30 22:25:03 (ERR) 	 > 2022-07-30-compilations-NONTR.sql
-		33 - 2022-08-30 22:25:03 (3s)  	 > 2022-07-30-compilations-fix.sql
-		32 - 2022-08-30 22:25:34 (1s)    > 2022-07-28-jwlinks.sql
-		31 - 2022-08-30 22:23:12 (5m 4s) > 2022-07-18-movieComments.sql
+    Showing last migrations in public.pgMigrations:
+    34 - 2022-08-30 22:25:03 (ERR) 	 > 2022-07-30-compilations-NONTR.sql
+    33 - 2022-08-30 22:25:03 (3s)  	 > 2022-07-30-compilations-fix.sql
+    32 - 2022-08-30 22:25:34 (1s)    > 2022-07-28-jwlinks.sql
+    31 - 2022-08-30 22:23:12 (5m 4s) > 2022-07-18-movieComments.sql
 
 ### Verify
 

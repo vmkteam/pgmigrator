@@ -86,6 +86,7 @@ A: Цель - простая утилита, которая работает с 
     plan        Shows migration files which can be applied
     redo        Rerun last applied migration from db
     run         Applies all new migrations
+    skip        Marks migrations done without actually running them.
     verify      Checks and shows invalid migrations
     
     Flags:
@@ -156,6 +157,10 @@ A: Цель - простая утилита, которая работает с 
 **Вывод**
 
 Как в `Run`, только в конце выводим сообщение о ROLLBACK.
+
+### Skip
+
+Как и `Run`, но без выполнения sql миграции. Только добавление записи о том, что миграция применена 
 
 ### Last
 
