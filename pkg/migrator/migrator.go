@@ -34,6 +34,19 @@ func NewMigrator(db *pg.DB, cfg Config, rootDir string) *Migrator {
 	return m
 }
 
+// writeMigrationToDB inserts log that migration was completed in postgres
+func writeMigrationToDB(ctx context.Context, mg Migration, tx *pg.Tx, start time.Time) error {
+	finish := time.Now()
+	pm := mg.ToDB()
+	pm.StartedAt = start
+	pm.FinishedAt = &finish
+
+	if _, err := tx.ModelContext(ctx, pm).Insert(); err != nil {
+		return fmt.Errorf(`add new migration "%s" failed: %w`, mg.Filename, err)
+	}
+	return nil
+}
+
 // readAllFiles read files from migrator root dir and return its filenames
 func (m *Migrator) readAllFiles() ([]string, error) {
 	dir, err := os.Open(m.rootDir)
@@ -191,17 +204,7 @@ func (m *Migrator) applyMigration(ctx context.Context, mg Migration) (err error)
 		return fmt.Errorf(`apply migration failed: %w`, err)
 	}
 
-	// insert into pgMigrations
-	finish := time.Now()
-	pm := mg.ToDB()
-	pm.StartedAt = start
-	pm.FinishedAt = &finish
-
-	if _, err = tx.ModelContext(ctx, pm).Insert(); err != nil {
-		return fmt.Errorf(`add new migration failed: %w`, err)
-	}
-
-	return nil
+	return writeMigrationToDB(ctx, mg, tx, start)
 }
 
 // setStatementTimeout set statement timeout to transaction connection
@@ -293,14 +296,52 @@ func (m *Migrator) dryRunMigrations(ctx context.Context, mm Migrations, chCurren
 			return fmt.Errorf(`apply migration "%s" failed: %w`, mg.Filename, err)
 		}
 
-		// insert into pgMigrations
-		finish := time.Now()
-		pm := mg.ToDB()
-		pm.StartedAt = start
-		pm.FinishedAt = &finish
+		if err = writeMigrationToDB(ctx, mg, tx, start); err != nil {
+			return err
+		}
+	}
 
-		if _, err = tx.ModelContext(ctx, pm).Insert(); err != nil {
-			return fmt.Errorf(`add new migration "%s" failed: %w`, mg.Filename, err)
+	return nil
+}
+
+// Skip marks migrations as completed
+func (m *Migrator) Skip(ctx context.Context, filenames []string, chCurrentFile chan string) error {
+	defer close(chCurrentFile)
+
+	// create migration table if not exists
+	if err := m.createMigratorTable(ctx); err != nil {
+		return err
+	}
+
+	// prepare migrations
+	mm, err := m.newMigrations(filenames)
+	if err != nil {
+		return fmt.Errorf("prepare migrations failed: %w", err)
+	}
+
+	// skip migrations
+	if err := m.skipMigrations(ctx, mm, chCurrentFile); err != nil {
+		return fmt.Errorf("skip migrations failed: %w", err)
+	}
+	return nil
+}
+
+func (m *Migrator) skipMigrations(ctx context.Context, mm Migrations, chCurrentFile chan string) (err error) {
+	var tx *pg.Tx
+	tx, err = m.db.Begin()
+	if err != nil {
+		return fmt.Errorf(`begin transaction failed: %w`, err)
+	}
+
+	defer func() {
+		err = finishTxOnErr(tx, err)
+	}()
+
+	// write migrations to pgMigrations table
+	for _, mg := range mm {
+		chCurrentFile <- mg.Filename
+		if err = writeMigrationToDB(ctx, mg, tx, time.Now()); err != nil {
+			return err
 		}
 	}
 
