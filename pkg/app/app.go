@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -56,6 +57,7 @@ func (a App) Run(ctx context.Context) error {
 			log.Fatal("Configuration file was not found. Please create new via `pgmigrator init`")
 		}
 	}
+	a.rootCmd.SilenceUsage = true
 
 	return a.rootCmd.Execute()
 }
@@ -66,13 +68,12 @@ func (a App) initCmd() *cobra.Command {
 		Use:   "init",
 		Short: "Initialize default configuration file in current directory",
 		Long:  `Initialize default configuration file in current directory. If -c flag passed, initialize file with this name`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			var buf bytes.Buffer
 
 			enc := toml.NewEncoder(&buf)
 			if err := enc.Encode(migrator.NewDefaultConfig()); err != nil {
-				log.Fatalf("Failed to create file: %v", err)
-				return
+				return fmt.Errorf("failed to create file: %w", err)
 			}
 
 			// write default DB config
@@ -85,11 +86,11 @@ func (a App) initCmd() *cobra.Command {
   PoolSize = 1
   ApplicationName = "pgmigrator"`)
 			if err := os.WriteFile(a.cfg.ConfigFile, buf.Bytes(), 0644); err != nil {
-				log.Fatalf("Failed to write file %s: %v", a.cfg.ConfigFile, err)
-				return
+				return fmt.Errorf("failed to write file %s: %w", a.cfg.ConfigFile, err)
 			}
 
 			log.Printf("File %v was successfully created.", a.cfg.ConfigFile)
+			return nil
 		},
 	}
 }
@@ -101,16 +102,16 @@ func (a App) lastCmd(ctx context.Context) *cobra.Command {
 		Short: "Shows recent applied migrations from db",
 		Long: `Shows recent applied migrations from db.
 If <count> applied, shows recent <count> applied migrations. By default: 5`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// calculate count
 			cnt, err := count(args)
 			if err != nil {
-				log.Fatal("invalid argument")
+				return errors.New("invalid argument")
 			}
 
 			mm, err := a.mg.Last(ctx, cnt)
 			if err != nil {
-				log.Fatal("Execute command error: %w", err)
+				return fmt.Errorf("execute command error: %w", err)
 			}
 
 			// print table
@@ -125,6 +126,7 @@ If <count> applied, shows recent <count> applied migrations. By default: 5`,
 
 			fmt.Printf("Showing last %d migrations in %s:\n", cnt, a.cfg.App.Table)
 			prepareTable(tbl).Print()
+			return nil
 		},
 	}
 }
@@ -135,14 +137,13 @@ func (a App) planCmd(ctx context.Context) *cobra.Command {
 		Use:   "plan",
 		Short: "Shows migration files which can be applied",
 		Long:  ``,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			mm, err := a.mg.Plan(ctx)
 			if err != nil {
-				log.Fatalf("Execute command failed: %v", err)
-				return
+				return fmt.Errorf("execute command failed: %w", err)
 			} else if len(mm) == 0 {
 				fmt.Println("No new migrations were found.")
-				return
+				return nil
 			}
 
 			// print table
@@ -152,6 +153,7 @@ func (a App) planCmd(ctx context.Context) *cobra.Command {
 				tbl.AddRow(i+1, m)
 			}
 			prepareTable(tbl).Print()
+			return nil
 		},
 	}
 }
@@ -162,13 +164,13 @@ func (a App) verifyCmd(ctx context.Context) *cobra.Command {
 		Use:   "verify",
 		Short: "Checks and shows invalid migrations",
 		Long:  ``,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			mm, err := a.mg.Verify(ctx)
 			if err != nil {
-				log.Fatalf("Execute command error: %v", err)
+				return fmt.Errorf("execute command error: %w", err)
 			} else if len(mm) == 0 {
 				fmt.Println("All applied migrations are correct!")
-				return
+				return nil
 			}
 
 			// print table
@@ -179,6 +181,7 @@ func (a App) verifyCmd(ctx context.Context) *cobra.Command {
 			}
 
 			prepareTable(tbl).Print()
+			return nil
 		},
 	}
 }
@@ -190,14 +193,14 @@ func (a App) runCmd(ctx context.Context) *cobra.Command {
 		Short: "Applies all new migrations",
 		Long: `Applies all new migrations.
 If <count> applied, applies only <count> migrations from plan. By default: 5`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// plan to apply
 			mm, err := a.mg.Plan(ctx)
 			if err != nil {
-				log.Fatalf("Execute command failed: %v\n", err)
+				return fmt.Errorf("execute command failed: %w", err)
 			} else if len(mm) == 0 {
 				fmt.Println("No new migrations were found.")
-				return
+				return nil
 			}
 
 			// calculate count
@@ -214,10 +217,10 @@ If <count> applied, applies only <count> migrations from plan. By default: 5`,
 			wg := &sync.WaitGroup{}
 			go readCh(ch, wg)
 			if err = a.mg.Run(ctx, mm[:cnt], ch); err != nil {
-				fmt.Printf("Apply migration error: %v", err)
-				return
+				return fmt.Errorf("apply migration error: %w", err)
 			}
 			wg.Wait()
+			return nil
 		},
 	}
 }
@@ -229,14 +232,14 @@ func (a App) dryRunCmd(ctx context.Context) *cobra.Command {
 		Short: "Tries to apply migrations. Runs migrations inside single transaction and always rollbacks it",
 		Long: `Tries to apply migrations. Runs migrations inside single transaction and always rollbacks it.
 If <count> applied, runs only <count> migrations. By default: 5`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// plan to apply
 			mm, err := a.mg.Plan(ctx)
 			if err != nil {
-				log.Fatalf("Execute command failed: %v\n", err)
+				return fmt.Errorf("execute command failed: %w", err)
 			} else if len(mm) == 0 {
 				fmt.Println("No new migrations were found.")
-				return
+				return nil
 			}
 
 			// calculate count
@@ -253,11 +256,11 @@ If <count> applied, runs only <count> migrations. By default: 5`,
 			wg := &sync.WaitGroup{}
 			go readCh(ch, wg)
 			if err = a.mg.DryRun(ctx, mm[:cnt], ch); err != nil {
-				log.Fatalf("Apply migration error: %v", err)
-				return
+				return fmt.Errorf("apply migration error: %w", err)
 			}
 			wg.Wait()
 			fmt.Println("ROLLBACK")
+			return nil
 		},
 	}
 }
@@ -269,14 +272,14 @@ func (a App) skipCmd(ctx context.Context) *cobra.Command {
 		Short: "Marks migrations done without actually running them",
 		Long: `Marks migrations done without actually running them.
 If <count> applied, marks only first <count> migrations displayed in plan. Default <count> = 5.`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// get list of migrations
 			mm, err := a.mg.Plan(ctx)
 			if err != nil {
-				log.Fatalf("Execute command failed: %v\n", err)
+				return fmt.Errorf("execute command failed: %w", err)
 			} else if len(mm) == 0 {
 				fmt.Println("No new migrations were found.")
-				return
+				return nil
 			}
 
 			// calculate count
@@ -293,11 +296,11 @@ If <count> applied, marks only first <count> migrations displayed in plan. Defau
 			go readCh(ch, wg)
 			fmt.Println("Skipping migrations...")
 			if err = a.mg.Skip(ctx, mm[:cnt], ch); err != nil {
-				log.Fatalf("Skip migration error: %v", err)
-				return
+				return fmt.Errorf("skip migration error: %w", err)
 			}
 			wg.Wait()
 			fmt.Println("Done")
+			return nil
 		},
 	}
 }
@@ -308,17 +311,17 @@ func (a App) redoCmd(ctx context.Context) *cobra.Command {
 		Use:   "redo",
 		Short: "Rerun last applied migration from db",
 		Long:  ``,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Println("Redo last migration:")
 			ch := make(chan string)
 			wg := &sync.WaitGroup{}
 			go readCh(ch, wg)
 			_, err := a.mg.Redo(ctx, ch)
 			if err != nil {
-				log.Fatalf("Apply migration error: %v", err)
-				return
+				return fmt.Errorf("apply migration error: %w", err)
 			}
 			wg.Wait()
+			return nil
 		},
 	}
 }
