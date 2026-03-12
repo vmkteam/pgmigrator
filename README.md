@@ -209,5 +209,5 @@ It is recommended to have a different migrations table for each schema.
 * md5sum - md5 hash of migration file 
 
 ### Docker images
-- [Docker Hub](https://hub.docker.com/vmkteam/pgmigrator)
+- [Docker Hub](https://hub.docker.com/r/vmkteam/pgmigrator)
 - Packages Tab in this repo
