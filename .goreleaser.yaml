@@ -7,6 +7,9 @@ builds:
       - linux
       - windows
       - darwin
+    goarch:
+      - amd64
+      - arm64
 
 homebrew_casks:
   - name: pgmigrator
@@ -17,4 +20,4 @@ homebrew_casks:
     repository:
       owner: vmkteam
       name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
