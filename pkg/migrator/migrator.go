@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -15,16 +16,18 @@ import (
 )
 
 type Migrator struct {
-	db      *pg.DB
-	cfg     Config
-	rootDir string // patches
+	db       *pg.DB
+	cfg      Config
+	rootDir  string // patches
+	fileMask *regexp.Regexp
 }
 
 func NewMigrator(db *pg.DB, cfg Config, rootDir string) *Migrator {
 	m := &Migrator{
-		db:      db,
-		cfg:     cfg,
-		rootDir: rootDir,
+		db:       db,
+		cfg:      cfg,
+		rootDir:  rootDir,
+		fileMask: regexp.MustCompile(cfg.FileMask),
 	}
 
 	if db != nil {
@@ -61,9 +64,8 @@ func (m *Migrator) readAllFiles() ([]string, error) {
 	}
 
 	var filenames []string
-	var namesToExecRegex = regexp.MustCompile(m.cfg.FileMask)
 	for _, f := range files {
-		if f.IsDir() || !namesToExecRegex.MatchString(f.Name()) {
+		if f.IsDir() || !m.fileMask.MatchString(f.Name()) {
 			continue
 		} else if strings.HasSuffix(f.Name(), "MANUAL.sql") {
 			// skip manual migrations
@@ -350,7 +352,7 @@ func (m *Migrator) skipMigrations(ctx context.Context, mm Migrations, chCurrentF
 
 func alwaysRollbackTx(tx *pg.Tx, err error) error {
 	if er := tx.Rollback(); er != nil {
-		err = fmt.Errorf("failed to finish transation er=%w: %w", er, err)
+		err = fmt.Errorf("failed to finish transaction er=%w: %w", er, err)
 	}
 
 	return err
@@ -434,8 +436,8 @@ func (m *Migrator) Redo(ctx context.Context, chCurrentFile chan string) (*PgMigr
 		return nil, fmt.Errorf(`fetch last migration failed: %w`, err)
 	}
 
-	// create and check if exists
-	if _, err := NewMigration(m.rootDir, pm.Filename); err != nil {
+	// check if migration file exists
+	if _, err := os.Stat(filepath.Join(m.rootDir, pm.Filename)); err != nil {
 		return nil, fmt.Errorf(`find migration file "%s" failed: %w`, pm.Filename, err)
 	}
 

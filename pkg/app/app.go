@@ -206,7 +206,7 @@ If <count> applied, applies only <count> migrations from plan. By default: 5`,
 			// calculate count
 			cnt, err := count(args)
 			if err != nil {
-				log.Fatal("invalid argument")
+				return errors.New("invalid argument")
 			} else if cnt > len(mm) {
 				cnt = len(mm)
 			}
@@ -245,7 +245,7 @@ If <count> applied, runs only <count> migrations. By default: 5`,
 			// calculate count
 			cnt, err := count(args)
 			if err != nil {
-				log.Fatal("invalid argument")
+				return errors.New("invalid argument")
 			} else if cnt > len(mm) {
 				cnt = len(mm)
 			}
@@ -285,7 +285,7 @@ If <count> applied, marks only first <count> migrations displayed in plan. Defau
 			// calculate count
 			cnt, err := count(args)
 			if err != nil {
-				log.Fatal("invalid argument")
+				return errors.New("invalid argument")
 			} else if cnt > len(mm) {
 				cnt = len(mm)
 			}

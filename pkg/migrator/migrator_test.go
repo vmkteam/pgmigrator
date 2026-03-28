@@ -6,7 +6,8 @@ import (
 	"testing"
 
 	"github.com/go-pg/pg/v10"
-	. "github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -42,67 +43,60 @@ func TestMain(m *testing.M) {
 func TestMigrator_Plan(t *testing.T) {
 	ctx := context.Background()
 
-	Convey("TestMigrator_Plan", t, func() {
-		err := recreateSchema()
-		So(err, ShouldBeNil)
+	err := recreateSchema()
+	require.NoError(t, err)
 
-		want := []string{
-			"2022-12-12-01-create-table-statuses.sql",
-			"2022-12-12-02-create-table-news.sql",
-			"2022-12-12-03-add-comments-news-NONTR.sql",
-			"2022-12-13-01-create-categories-table.sql",
-			"2022-12-13-02-create-tags-table.sql",
-		}
-		got, err := testMigrator.Plan(ctx)
-		So(err, ShouldBeNil)
-		So(got, ShouldResemble, want)
-	})
+	want := []string{
+		"2022-12-12-01-create-table-statuses.sql",
+		"2022-12-12-02-create-table-news.sql",
+		"2022-12-12-03-add-comments-news-NONTR.sql",
+		"2022-12-13-01-create-categories-table.sql",
+		"2022-12-13-02-create-tags-table.sql",
+	}
+	got, err := testMigrator.Plan(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
 }
 
 func TestMigrator_readFiles(t *testing.T) {
-	Convey("TestMigrator_readFiles", t, func() {
-		want := []string{
-			"2022-12-12-01-create-table-statuses.sql",
-			"2022-12-12-02-create-table-news.sql",
-			"2022-12-12-03-add-comments-news-NONTR.sql",
-			"2022-12-13-01-create-categories-table.sql",
-			"2022-12-13-02-create-tags-table.sql",
-		}
+	want := []string{
+		"2022-12-12-01-create-table-statuses.sql",
+		"2022-12-12-02-create-table-news.sql",
+		"2022-12-12-03-add-comments-news-NONTR.sql",
+		"2022-12-13-01-create-categories-table.sql",
+		"2022-12-13-02-create-tags-table.sql",
+	}
 
-		filenames, err := testMigrator.readAllFiles()
-		So(err, ShouldBeNil)
-		So(filenames, ShouldResemble, want)
-	})
+	filenames, err := testMigrator.readAllFiles()
+	require.NoError(t, err)
+	assert.Equal(t, want, filenames)
 }
 
 func TestMigrator_compareFilenames(t *testing.T) {
-	Convey("TestMigrator_compareFilenames", t, func() {
-		dirFiles := []string{
-			"2022-12-12-01-create-table-statuses.sql",
-			"2022-12-12-02-create-table-news.sql",
-			"2022-12-12-03-add-comments-news-NONTR.sql",
-			"2022-12-13-01-create-categories-table.sql",
-			"2022-12-13-02-create-tags-table.sql",
-		}
-		completedFiles := []string{"2022-12-12-01-create-table-statuses.sql"}
-		want := []string{
-			"2022-12-12-02-create-table-news.sql",
-			"2022-12-12-03-add-comments-news-NONTR.sql",
-			"2022-12-13-01-create-categories-table.sql",
-			"2022-12-13-02-create-tags-table.sql",
-		}
-		res := testMigrator.removeCompleted(dirFiles, completedFiles)
-		So(res, ShouldResemble, want)
-	})
+	dirFiles := []string{
+		"2022-12-12-01-create-table-statuses.sql",
+		"2022-12-12-02-create-table-news.sql",
+		"2022-12-12-03-add-comments-news-NONTR.sql",
+		"2022-12-13-01-create-categories-table.sql",
+		"2022-12-13-02-create-tags-table.sql",
+	}
+	completedFiles := []string{"2022-12-12-01-create-table-statuses.sql"}
+	want := []string{
+		"2022-12-12-02-create-table-news.sql",
+		"2022-12-12-03-add-comments-news-NONTR.sql",
+		"2022-12-13-01-create-categories-table.sql",
+		"2022-12-13-02-create-tags-table.sql",
+	}
+	res := testMigrator.removeCompleted(dirFiles, completedFiles)
+	assert.Equal(t, want, res)
 }
 
 func TestNewMigration(t *testing.T) {
-	Convey("TestMigrator_compareFilenames", t, func() {
-		res, err := NewMigration(testMigrator.rootDir, "2022-12-12-01-create-table-statuses.sql")
-		So(err, ShouldBeNil)
-		So(res, ShouldResemble, Migration{
-			Filename: "2022-12-12-01-create-table-statuses.sql",
-			Data: []byte(`CREATE TABLE "statuses"
+	res, err := NewMigration(testMigrator.rootDir, "2022-12-12-01-create-table-statuses.sql")
+	require.NoError(t, err)
+	assert.Equal(t, Migration{
+		Filename: "2022-12-12-01-create-table-statuses.sql",
+		Data: []byte(`CREATE TABLE "statuses"
 (
     "statusId" SERIAL       NOT NULL,
     "title"    varchar(255) NOT NULL,
@@ -111,105 +105,83 @@ func TestNewMigration(t *testing.T) {
     CONSTRAINT "statuses_alias_key" UNIQUE ("alias")
 );
 `),
-			Md5Sum:        "463fe73a85e13dd55fe210904ec19d7c",
-			Transactional: true,
-		})
-	})
+		Md5Sum:        "463fe73a85e13dd55fe210904ec19d7c",
+		Transactional: true,
+	}, res)
 }
 
 func TestMigrator_prepareMigrationsToRun(t *testing.T) {
-	Convey("TestMigrator_prepareMigrationsToRun", t, func() {
-		dirFiles := []string{
-			"2022-12-12-01-create-table-statuses.sql",
-			"2022-12-12-02-create-table-news.sql",
-			"2022-12-12-03-add-comments-news-NONTR.sql",
-			"2022-12-13-01-create-categories-table.sql",
-			"2022-12-13-02-create-tags-table.sql",
-		}
-		want := []Migration{
-			{
-				Filename:      "2022-12-12-01-create-table-statuses.sql",
-				Transactional: true,
-			},
-			{
-				Filename:      "2022-12-12-02-create-table-news.sql",
-				Transactional: true,
-			},
-			{
-				Filename:      "2022-12-12-03-add-comments-news-NONTR.sql",
-				Transactional: false,
-			},
-			{
-				Filename:      "2022-12-13-01-create-categories-table.sql",
-				Transactional: true,
-			},
-			{
-				Filename:      "2022-12-13-02-create-tags-table.sql",
-				Transactional: true,
-			},
-		}
+	dirFiles := []string{
+		"2022-12-12-01-create-table-statuses.sql",
+		"2022-12-12-02-create-table-news.sql",
+		"2022-12-12-03-add-comments-news-NONTR.sql",
+		"2022-12-13-01-create-categories-table.sql",
+		"2022-12-13-02-create-tags-table.sql",
+	}
+	want := []Migration{
+		{Filename: "2022-12-12-01-create-table-statuses.sql", Transactional: true},
+		{Filename: "2022-12-12-02-create-table-news.sql", Transactional: true},
+		{Filename: "2022-12-12-03-add-comments-news-NONTR.sql", Transactional: false},
+		{Filename: "2022-12-13-01-create-categories-table.sql", Transactional: true},
+		{Filename: "2022-12-13-02-create-tags-table.sql", Transactional: true},
+	}
 
-		res, err := testMigrator.newMigrations(dirFiles)
-		So(err, ShouldBeNil)
-		So(res, ShouldHaveLength, len(want))
+	res, err := testMigrator.newMigrations(dirFiles)
+	require.NoError(t, err)
+	require.Len(t, res, len(want))
 
-		for i, m := range res {
-			So(m.Filename, ShouldEqual, want[i].Filename)
-			So(m.Transactional, ShouldEqual, want[i].Transactional)
-		}
-	})
+	for i, m := range res {
+		assert.Equal(t, want[i].Filename, m.Filename)
+		assert.Equal(t, want[i].Transactional, m.Transactional)
+	}
 }
 
 func TestMigrator_applyNonTransactionalMigration(t *testing.T) {
 	t.Skip()
 	ctx := context.Background()
-	Convey("TestMigrator_applyNonTransactionalMigration", t, func() {
-		err := recreateSchema()
-		So(err, ShouldBeNil)
 
-		_, err = testMigrator.db.ExecContext(ctx, `create table news (id text);`)
-		So(err, ShouldBeNil)
-		mg, err := NewMigration(testMigrator.rootDir, "2022-12-12-03-add-comments-news-NONTR.sql")
-		So(err, ShouldBeNil)
+	err := recreateSchema()
+	require.NoError(t, err)
 
-		err = testMigrator.applyNonTransactionalMigration(ctx, mg)
-		So(err, ShouldBeNil)
+	_, err = testMigrator.db.ExecContext(ctx, `create table news (id text);`)
+	require.NoError(t, err)
 
-		var pm PgMigration
-		err = testMigrator.db.ModelContext(ctx, &pm).Where(`"filename" = ?`, mg.Filename).Select()
-		So(err, ShouldBeNil)
-		So(pm, ShouldNotBeNil)
-		So(pm.FinishedAt, ShouldNotBeEmpty)
-	})
+	mg, err := NewMigration(testMigrator.rootDir, "2022-12-12-03-add-comments-news-NONTR.sql")
+	require.NoError(t, err)
+
+	err = testMigrator.applyNonTransactionalMigration(ctx, mg)
+	require.NoError(t, err)
+
+	var pm PgMigration
+	err = testMigrator.db.ModelContext(ctx, &pm).Where(`"filename" = ?`, mg.Filename).Select()
+	require.NoError(t, err)
+	assert.NotEmpty(t, pm.FinishedAt)
 }
 
 func TestMigrator_applyMigration(t *testing.T) {
 	t.Skip()
 	ctx := context.Background()
-	Convey("TestMigrator_applyMigration", t, func() {
-		mg, err := NewMigration(testMigrator.rootDir, "2022-12-12-01-create-table-statuses.sql")
-		So(err, ShouldBeNil)
 
-		err = testMigrator.applyMigration(ctx, mg)
-		So(err, ShouldBeNil)
+	mg, err := NewMigration(testMigrator.rootDir, "2022-12-12-01-create-table-statuses.sql")
+	require.NoError(t, err)
 
-		var pm PgMigration
-		err = testMigrator.db.ModelContext(ctx, &pm).Where(`"filename" = ?`, mg.Filename).Select()
-		So(err, ShouldBeNil)
-		So(pm, ShouldNotBeNil)
-		So(pm.FinishedAt, ShouldNotBeEmpty)
-	})
+	err = testMigrator.applyMigration(ctx, mg)
+	require.NoError(t, err)
+
+	var pm PgMigration
+	err = testMigrator.db.ModelContext(ctx, &pm).Where(`"filename" = ?`, mg.Filename).Select()
+	require.NoError(t, err)
+	assert.NotEmpty(t, pm.FinishedAt)
 }
 
 func TestMigrator_Run(t *testing.T) {
 	ctx := context.Background()
-	Convey("TestMigrator_Run", t, func() {
-		err := recreateSchema()
-		So(err, ShouldBeNil)
 
-		err = execRun(ctx, t)
-		So(err, ShouldBeNil)
-	})
+	err := recreateSchema()
+	require.NoError(t, err)
+
+	err = execRun(ctx, t)
+	require.NoError(t, err)
 }
 
 func execRun(ctx context.Context, t *testing.T) error {
@@ -226,269 +198,257 @@ func execRun(ctx context.Context, t *testing.T) error {
 
 func TestMigrator_Last(t *testing.T) {
 	ctx := context.Background()
-	Convey("TestMigrator_Last", t, func() {
-		Convey("check empty list", func() {
-			err := recreateSchema()
-			So(err, ShouldBeNil)
 
-			list, err := testMigrator.Last(ctx, 5)
-			So(err, ShouldBeNil)
-			So(list, ShouldHaveLength, 0)
-		})
-		Convey("check all applied list", func() {
-			err := recreateSchema()
-			So(err, ShouldBeNil)
-			err = execRun(ctx, t)
-			So(err, ShouldBeNil)
+	t.Run("empty list", func(t *testing.T) {
+		err := recreateSchema()
+		require.NoError(t, err)
 
-			list, err := testMigrator.Last(ctx, 5)
-			So(err, ShouldBeNil)
-			So(list, ShouldHaveLength, 5)
-		})
-		Convey("check 3 last migrations", func() {
-			list, err := testMigrator.Last(ctx, 3)
-			So(err, ShouldBeNil)
-			So(list, ShouldHaveLength, 3)
-		})
+		list, err := testMigrator.Last(ctx, 5)
+		require.NoError(t, err)
+		assert.Empty(t, list)
+	})
+
+	t.Run("all applied", func(t *testing.T) {
+		err := recreateSchema()
+		require.NoError(t, err)
+		err = execRun(ctx, t)
+		require.NoError(t, err)
+
+		list, err := testMigrator.Last(ctx, 5)
+		require.NoError(t, err)
+		assert.Len(t, list, 5)
+	})
+
+	t.Run("3 last migrations", func(t *testing.T) {
+		list, err := testMigrator.Last(ctx, 3)
+		require.NoError(t, err)
+		assert.Len(t, list, 3)
 	})
 }
 
 func TestMigrator_Redo(t *testing.T) {
 	ctx := context.Background()
-	Convey("TestMigrator_Redo", t, func() {
-		Convey("check if migrations wasn't applied", func() {
-			err := recreateSchema()
-			So(err, ShouldBeNil)
 
-			ch := make(chan string)
-			go readFromCh(ch, t)
+	t.Run("no applied migrations", func(t *testing.T) {
+		err := recreateSchema()
+		require.NoError(t, err)
 
-			pm, err := testMigrator.Redo(ctx, ch)
-			So(err.Error(), ShouldEqual, "applied migrations were not found")
-			So(pm, ShouldBeNil)
-		})
-		Convey("redo last applied", func() {
-			err := recreateSchema()
-			So(err, ShouldBeNil)
+		ch := make(chan string)
+		go readFromCh(ch, t)
 
-			err = execRun(ctx, t)
-			So(err, ShouldBeNil)
+		pm, err := testMigrator.Redo(ctx, ch)
+		require.EqualError(t, err, "applied migrations were not found")
+		assert.Nil(t, pm)
+	})
 
-			_, err = testDB.Exec("DROP TABLE tags CASCADE;")
-			So(err, ShouldBeNil)
+	t.Run("redo last applied", func(t *testing.T) {
+		err := recreateSchema()
+		require.NoError(t, err)
 
-			ch := make(chan string)
-			go readFromCh(ch, t)
+		err = execRun(ctx, t)
+		require.NoError(t, err)
 
-			pm, err := testMigrator.Redo(ctx, ch)
-			So(err, ShouldBeNil)
-			So(pm, ShouldResemble, &PgMigration{
-				ID:            pm.ID,
-				Filename:      "2022-12-13-02-create-tags-table.sql",
-				StartedAt:     pm.StartedAt,
-				FinishedAt:    pm.FinishedAt,
-				Transactional: true,
-				Md5sum:        "d10bca7f78e847d3d4e71003b31a54a6",
-			})
-		})
+		_, err = testDB.Exec("DROP TABLE tags CASCADE;")
+		require.NoError(t, err)
+
+		ch := make(chan string)
+		go readFromCh(ch, t)
+
+		pm, err := testMigrator.Redo(ctx, ch)
+		require.NoError(t, err)
+		assert.Equal(t, &PgMigration{
+			ID:            pm.ID,
+			Filename:      "2022-12-13-02-create-tags-table.sql",
+			StartedAt:     pm.StartedAt,
+			FinishedAt:    pm.FinishedAt,
+			Transactional: true,
+			Md5sum:        "d10bca7f78e847d3d4e71003b31a54a6",
+		}, pm)
 	})
 }
 
 func TestMigrator_dryRunMigrations(t *testing.T) {
 	ctx := context.Background()
-	Convey("TestMigrator_prepareMigrationsToDryRun", t, func() {
+
+	err := recreateSchema()
+	require.NoError(t, err)
+	err = testMigrator.createMigratorTable(ctx)
+	require.NoError(t, err)
+
+	dirFiles := []string{
+		"2022-12-12-01-create-table-statuses.sql",
+		"2022-12-12-02-create-table-news.sql",
+	}
+	mm, err := testMigrator.newMigrations(dirFiles)
+	require.NoError(t, err)
+
+	ch := make(chan string)
+	go readFromCh(ch, t)
+	err = testMigrator.dryRunMigrations(ctx, mm, ch)
+	require.NoError(t, err)
+}
+
+func TestMigrator_DryRun(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("transactional migrations", func(t *testing.T) {
 		err := recreateSchema()
-		So(err, ShouldBeNil)
-		err = testMigrator.createMigratorTable(ctx)
-		So(err, ShouldBeNil)
+		require.NoError(t, err)
 
 		dirFiles := []string{
 			"2022-12-12-01-create-table-statuses.sql",
 			"2022-12-12-02-create-table-news.sql",
 		}
-		mm, err := testMigrator.newMigrations(dirFiles)
-		So(err, ShouldBeNil)
 
 		ch := make(chan string)
 		go readFromCh(ch, t)
-		err = testMigrator.dryRunMigrations(ctx, mm, ch)
-		So(err, ShouldBeNil)
+
+		err = testMigrator.DryRun(ctx, dirFiles, ch)
+		require.NoError(t, err)
 	})
-}
 
-func TestMigrator_DryRun(t *testing.T) {
-	ctx := context.Background()
-	Convey("TestMigrator_DryRun", t, func() {
-		Convey("check transactional migrations to dry run", func() {
-			err := recreateSchema()
-			So(err, ShouldBeNil)
+	t.Run("with non transactional migrations", func(t *testing.T) {
+		err := recreateSchema()
+		require.NoError(t, err)
 
-			dirFiles := []string{
-				"2022-12-12-01-create-table-statuses.sql",
-				"2022-12-12-02-create-table-news.sql",
-			}
+		dirFiles := []string{
+			"2022-12-12-01-create-table-statuses.sql",
+			"2022-12-12-02-create-table-news.sql",
+			"2022-12-12-03-add-comments-news-NONTR.sql",
+			"2022-12-13-01-create-categories-table.sql",
+			"2022-12-13-02-create-tags-table.sql",
+		}
 
-			ch := make(chan string)
-			go readFromCh(ch, t)
+		ch := make(chan string)
+		go readFromCh(ch, t)
 
-			err = testMigrator.DryRun(ctx, dirFiles, ch)
-			So(err, ShouldBeNil)
-		})
-
-		Convey("check with non transactional migrations to dry run", func() {
-			err := recreateSchema()
-			So(err, ShouldBeNil)
-			dirFiles := []string{
-				"2022-12-12-01-create-table-statuses.sql",
-				"2022-12-12-02-create-table-news.sql",
-				"2022-12-12-03-add-comments-news-NONTR.sql",
-				"2022-12-13-01-create-categories-table.sql",
-				"2022-12-13-02-create-tags-table.sql",
-			}
-
-			ch := make(chan string)
-			go readFromCh(ch, t)
-
-			err = testMigrator.DryRun(ctx, dirFiles, ch)
-			So(err.Error(), ShouldEqual, `non transactional migration found "2022-12-12-03-add-comments-news-NONTR.sql", run all migrations before it, please`)
-		})
+		err = testMigrator.DryRun(ctx, dirFiles, ch)
+		assert.EqualError(t, err, `non transactional migration found "2022-12-12-03-add-comments-news-NONTR.sql", run all migrations before it, please`)
 	})
 }
 
 func TestMigrator_skipMigrations(t *testing.T) {
 	ctx := context.Background()
-	Convey("TestMigrator_skipMigrations", t, func() {
-		err := recreateSchema()
-		So(err, ShouldBeNil)
-		err = testMigrator.createMigratorTable(ctx)
-		So(err, ShouldBeNil)
 
-		dirFiles := []string{
-			"2022-12-12-01-create-table-statuses.sql",
-			"2022-12-12-02-create-table-news.sql",
-		}
-		mm, err := testMigrator.newMigrations(dirFiles)
-		So(err, ShouldBeNil)
+	err := recreateSchema()
+	require.NoError(t, err)
+	err = testMigrator.createMigratorTable(ctx)
+	require.NoError(t, err)
 
-		ch := make(chan string)
-		go readFromCh(ch, t)
-		err = testMigrator.skipMigrations(ctx, mm, ch)
-		So(err, ShouldBeNil)
+	dirFiles := []string{
+		"2022-12-12-01-create-table-statuses.sql",
+		"2022-12-12-02-create-table-news.sql",
+	}
+	mm, err := testMigrator.newMigrations(dirFiles)
+	require.NoError(t, err)
 
-		for _, mg := range mm {
-			var pm PgMigration
-			err = testMigrator.db.ModelContext(ctx, &pm).Where(`"filename" = ?`, mg.Filename).Select()
-			So(err, ShouldBeNil)
-			So(pm, ShouldNotBeNil)
-			So(pm.FinishedAt, ShouldNotBeEmpty)
-		}
-	})
+	ch := make(chan string)
+	go readFromCh(ch, t)
+	err = testMigrator.skipMigrations(ctx, mm, ch)
+	require.NoError(t, err)
+
+	for _, mg := range mm {
+		var pm PgMigration
+		err = testMigrator.db.ModelContext(ctx, &pm).Where(`"filename" = ?`, mg.Filename).Select()
+		require.NoError(t, err)
+		assert.NotEmpty(t, pm.FinishedAt)
+	}
 }
 
 func TestMigrator_Skip(t *testing.T) {
 	ctx := context.Background()
-	Convey("TestMigrator_Skip", t, func() {
-		err := recreateSchema()
-		So(err, ShouldBeNil)
-		filenames, err := testMigrator.Plan(ctx)
-		So(err, ShouldBeNil)
-		ch := make(chan string)
-		go readFromCh(ch, t)
-		err = testMigrator.Skip(ctx, filenames, ch)
-		So(err, ShouldBeNil)
-	})
+
+	err := recreateSchema()
+	require.NoError(t, err)
+
+	filenames, err := testMigrator.Plan(ctx)
+	require.NoError(t, err)
+
+	ch := make(chan string)
+	go readFromCh(ch, t)
+	err = testMigrator.Skip(ctx, filenames, ch)
+	require.NoError(t, err)
 }
 
 func TestMigrator_compareMD5Sum(t *testing.T) {
-	Convey("TestMigrator_compareMD5Sum", t, func() {
-		Convey("check correct", func() {
-			filenames := []string{
-				"2022-12-12-01-create-table-statuses.sql",
-				"2022-12-12-02-create-table-news.sql",
-			}
-			mm, err := testMigrator.newMigrations(filenames)
-			So(err, ShouldBeNil)
-			fileMigrations := mm.ToDB()
-			dbMigrations := []PgMigration{
-				{
-					Filename: "2022-12-12-01-create-table-statuses.sql",
-					Md5sum:   "463fe73a85e13dd55fe210904ec19d7c",
-				},
-				{
-					Filename: "2022-12-12-02-create-table-news.sql",
-					Md5sum:   "6158555b3ceb1a216b0cb365cb97fc71",
-				},
-			}
+	t.Run("correct checksums", func(t *testing.T) {
+		filenames := []string{
+			"2022-12-12-01-create-table-statuses.sql",
+			"2022-12-12-02-create-table-news.sql",
+		}
+		mm, err := testMigrator.newMigrations(filenames)
+		require.NoError(t, err)
 
-			invalid := testMigrator.compareMD5Sum(fileMigrations, dbMigrations)
-			So(invalid, ShouldHaveLength, 0)
-		})
-		Convey("check invalid", func() {
-			filenames := []string{
-				"2022-12-12-01-create-table-statuses.sql",
-				"2022-12-12-02-create-table-news.sql",
-			}
-			mm, err := testMigrator.newMigrations(filenames)
-			So(err, ShouldBeNil)
-			fileMigrations := mm.ToDB()
+		fileMigrations := mm.ToDB()
+		dbMigrations := []PgMigration{
+			{Filename: "2022-12-12-01-create-table-statuses.sql", Md5sum: "463fe73a85e13dd55fe210904ec19d7c"},
+			{Filename: "2022-12-12-02-create-table-news.sql", Md5sum: "6158555b3ceb1a216b0cb365cb97fc71"},
+		}
 
-			dbMigrations := []PgMigration{
-				{
-					Filename: "2022-12-12-01-create-table-statuses.sql",
-					Md5sum:   "463fe73a85e13dd55fe210904ec19d7c",
-				},
-				{
-					Filename: "2022-12-12-02-create-table-news.sql",
-					Md5sum:   "invalid!!!",
-				},
-			}
+		invalid := testMigrator.compareMD5Sum(fileMigrations, dbMigrations)
+		assert.Empty(t, invalid)
+	})
 
-			invalid := testMigrator.compareMD5Sum(fileMigrations, dbMigrations)
-			So(invalid, ShouldHaveLength, 1)
-			So(invalid[0].Filename, ShouldEqual, "2022-12-12-02-create-table-news.sql")
-		})
+	t.Run("invalid checksum", func(t *testing.T) {
+		filenames := []string{
+			"2022-12-12-01-create-table-statuses.sql",
+			"2022-12-12-02-create-table-news.sql",
+		}
+		mm, err := testMigrator.newMigrations(filenames)
+		require.NoError(t, err)
+
+		fileMigrations := mm.ToDB()
+		dbMigrations := []PgMigration{
+			{Filename: "2022-12-12-01-create-table-statuses.sql", Md5sum: "463fe73a85e13dd55fe210904ec19d7c"},
+			{Filename: "2022-12-12-02-create-table-news.sql", Md5sum: "invalid!!!"},
+		}
+
+		invalid := testMigrator.compareMD5Sum(fileMigrations, dbMigrations)
+		require.Len(t, invalid, 1)
+		assert.Equal(t, "2022-12-12-02-create-table-news.sql", invalid[0].Filename)
 	})
 }
 
 func TestMigrator_Verify(t *testing.T) {
 	ctx := context.Background()
-	Convey("TestMigrator_Verify", t, func() {
-		Convey("check from empty table", func() {
-			err := recreateSchema()
-			So(err, ShouldBeNil)
 
-			invalid, err := testMigrator.Verify(ctx)
-			So(err, ShouldBeNil)
-			So(invalid, ShouldHaveLength, 0)
-		})
-		Convey("check from correct migrations", func() {
-			err := recreateSchema()
-			So(err, ShouldBeNil)
+	t.Run("empty table", func(t *testing.T) {
+		err := recreateSchema()
+		require.NoError(t, err)
 
-			err = execRun(ctx, t)
-			So(err, ShouldBeNil)
+		invalid, err := testMigrator.Verify(ctx)
+		require.NoError(t, err)
+		assert.Empty(t, invalid)
+	})
 
-			invalid, err := testMigrator.Verify(ctx)
-			So(err, ShouldBeNil)
-			So(invalid, ShouldHaveLength, 0)
-		})
-		Convey("check from invalid migrations", func() {
-			err := recreateSchema()
-			So(err, ShouldBeNil)
+	t.Run("correct migrations", func(t *testing.T) {
+		err := recreateSchema()
+		require.NoError(t, err)
 
-			err = execRun(ctx, t)
-			So(err, ShouldBeNil)
+		err = execRun(ctx, t)
+		require.NoError(t, err)
 
-			invalidFilename := "2022-12-13-01-create-categories-table.sql"
-			pm := PgMigration{Md5sum: "invalid!!!"}
-			_, err = testMigrator.db.ModelContext(ctx, &pm).Column("md5sum").Where(`"filename" = ?`, invalidFilename).Update()
-			So(err, ShouldBeNil)
+		invalid, err := testMigrator.Verify(ctx)
+		require.NoError(t, err)
+		assert.Empty(t, invalid)
+	})
 
-			invalid, err := testMigrator.Verify(ctx)
-			So(err, ShouldBeNil)
-			So(invalid, ShouldHaveLength, 1)
-			So(invalid[0].Filename, ShouldEqual, invalidFilename)
-		})
+	t.Run("invalid migrations", func(t *testing.T) {
+		err := recreateSchema()
+		require.NoError(t, err)
+
+		err = execRun(ctx, t)
+		require.NoError(t, err)
+
+		invalidFilename := "2022-12-13-01-create-categories-table.sql"
+		pm := PgMigration{Md5sum: "invalid!!!"}
+		_, err = testMigrator.db.ModelContext(ctx, &pm).Column("md5sum").Where(`"filename" = ?`, invalidFilename).Update()
+		require.NoError(t, err)
+
+		invalid, err := testMigrator.Verify(ctx)
+		require.NoError(t, err)
+		require.Len(t, invalid, 1)
+		assert.Equal(t, invalidFilename, invalid[0].Filename)
 	})
 }
 
