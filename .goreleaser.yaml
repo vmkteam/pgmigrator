@@ -1,3 +1,5 @@
+version: 2
+
 builds:
   - env:
       - CGO_ENABLED=0
@@ -5,3 +7,17 @@ builds:
       - linux
       - windows
       - darwin
+    goarch:
+      - amd64
+      - arm64
+
+homebrew_casks:
+  - name: pgmigrator
+    binaries:
+      - pgmigrator
+    homepage: "https://github.com/vmkteam/pgmigrator"
+    description: "Command-line tool for PostgreSQL migrations"
+    repository:
+      owner: vmkteam
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"

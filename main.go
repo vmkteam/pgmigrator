@@ -7,19 +7,24 @@ import (
 	"path/filepath"
 	"runtime/debug"
 
+	"github.com/vmkteam/pgmigrator/pkg/app"
+	"github.com/vmkteam/pgmigrator/pkg/migrator"
+
 	"github.com/BurntSushi/toml"
 	"github.com/go-pg/pg/v10"
 	"github.com/spf13/cobra"
-	"github.com/vmkteam/pgmigrator/pkg/app"
-	"github.com/vmkteam/pgmigrator/pkg/migrator"
 )
 
-var cfgFile string
+var (
+	cfgFile       string
+	migrationsDir string
+)
 
 func main() {
 	log.SetFlags(0)
 	rootCmd := newRootCmd()
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", app.DefaultConfigFile, "configuration file")
+	rootCmd.PersistentFlags().StringVarP(&migrationsDir, "dir", "d", "", "path to migrations directory")
 	rootCmd.InitDefaultVersionFlag()
 	rootCmd.InitDefaultHelpFlag()
 	exitOnErr(rootCmd.ParseFlags(os.Args))
@@ -41,7 +46,13 @@ func main() {
 		cfg.ConfigFile, err = filepath.Abs(cfgFile)
 		exitOnErr(err)
 
-		mg = migrator.NewMigrator(pg.Connect(cfg.Database), cfg.App, filepath.Dir(cfg.ConfigFile))
+		rootDir := filepath.Dir(cfg.ConfigFile)
+		if migrationsDir != "" {
+			rootDir, err = filepath.Abs(migrationsDir)
+			exitOnErr(err)
+		}
+
+		mg = migrator.NewMigrator(pg.Connect(cfg.Database), cfg.App, rootDir)
 	}
 
 	// create app and run

@@ -11,13 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/vmkteam/pgmigrator/pkg/migrator"
+
 	"github.com/BurntSushi/toml"
 	"github.com/fatih/color"
 	"github.com/go-pg/pg/v10"
 	"github.com/rodaine/table"
 	"github.com/spf13/cobra"
-
-	"github.com/vmkteam/pgmigrator/pkg/migrator"
 )
 
 const (
@@ -206,7 +206,7 @@ If <count> applied, applies only <count> migrations from plan. By default: 5`,
 			// calculate count
 			cnt, err := count(args)
 			if err != nil {
-				log.Fatal("invalid argument")
+				return errors.New("invalid argument")
 			} else if cnt > len(mm) {
 				cnt = len(mm)
 			}
@@ -245,7 +245,7 @@ If <count> applied, runs only <count> migrations. By default: 5`,
 			// calculate count
 			cnt, err := count(args)
 			if err != nil {
-				log.Fatal("invalid argument")
+				return errors.New("invalid argument")
 			} else if cnt > len(mm) {
 				cnt = len(mm)
 			}
@@ -285,7 +285,7 @@ If <count> applied, marks only first <count> migrations displayed in plan. Defau
 			// calculate count
 			cnt, err := count(args)
 			if err != nil {
-				log.Fatal("invalid argument")
+				return errors.New("invalid argument")
 			} else if cnt > len(mm) {
 				cnt = len(mm)
 			}

@@ -1,10 +1,14 @@
 PKG := `go list -f {{.Dir}} ./...`
 
+LINT_VERSION := v2.8.0
+
 fmt:
-	@goimports -local "github.com/vmkteam/pgmigrator" -l -w $(PKG)
+	@golangci-lint fmt
 
 lint:
-	@golangci-lint run -c .golangci.yml
+	@golangci-lint version
+	@golangci-lint config verify
+	@golangci-lint run
 
 test:
 	@go test -v ./...

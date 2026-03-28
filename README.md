@@ -16,9 +16,6 @@ Limitations
 * Migrations filename mask: `YYYYY-MM-DDD-<description>.sql` / `YYYYY-MM-DD-<description>-NONTR.sql`
 * Migration types: UP only
 * Algorithm: applies sorted migrations files that are in the folder and fit the file mask, except for what is already applied in the database
-* The program works only with the configuration file located in the folder with migrations.
-
-
 FAQ
 --
 Q: Why only up migrations?<br>
@@ -89,6 +86,7 @@ Run
     
     Flags:
     -c, --config string   configuration file (default "pgmigrator.toml")
+    -d, --dir string      path to migrations directory
     -h, --help            help for pgmigrator
     -v, --version         version for pgmigrator
     
@@ -97,7 +95,7 @@ Run
 Any command supports an argument in the form of a number. For `last` it is the number of last migrations (default is 5). For all others - the number of the file from `plan` to which to apply migrations. If no argument is passed, there are no restrictions (or default ones are used).
 
 The base directory for migrations is the one where the configuration file is located.
-That is, you can call `pgmigrator --config docs/patches/pgmigrator.toml plan` and it will take all migrations from the `docs/patches` folder.
+You can override it with `--dir` flag: `pgmigrator --config pgmigrator.toml --dir docs/patches plan`.
 
 ## Commands
 
@@ -208,6 +206,14 @@ It is recommended to have a different migrations table for each schema.
 * transactional - transactional flag (false для NONTR migrations)
 * md5sum - md5 hash of migration file 
 
-### Docker images
+### Install
+
+#### Homebrew
+```bash
+brew tap vmkteam/tap
+brew install pgmigrator
+```
+
+#### Docker images
 - [Docker Hub](https://hub.docker.com/r/vmkteam/pgmigrator)
 - Packages Tab in this repo

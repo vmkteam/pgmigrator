@@ -1,82 +1,159 @@
-run:
-  # default concurrency is a available CPU number
-  concurrency: 4
-
-  # timeout for analysis, e.g. 30s, 5m, default is 1m
-  deadline: 30m
-
-  # exit code when at least one issue was found, default is 1
-  issues-exit-code: 1
-
-  # include test files or not, default is true
-  tests: true
-
-  # skip files
-  skip-files:
-    - ".*\\_gen\\.go$"
-
-output:
-  # colored-line-number|line-number|json|tab|checkstyle|code-climate, default is "colored-line-number"
-  format: colored-line-number
-
-  # print lines of code with issue, default is true
-  print-issued-lines: true
-
-  # print linter name in the end of issue text, default is true
-  print-linter-name: true
-
-linters-settings:
-  goimports:
-    # put imports beginning with prefix after 3rd-party packages;
-    # it's a comma-separated list of prefixes
-    local-prefixes: github.com/vmkteam/zenrpc
-  gocritic:
-    # Enable multiple checks by tags, run `GL_DEBUG=gocritic golangci-lint` run to see all tags and checks.
-    # Empty list by default. See https://github.com/go-critic/go-critic#usage -> section "Tags".
-    enabled-checks:
-      - appendAssign
-      - appendCombine
-      - assignOp
-      - badCond
-      - boolExprSimplify
-      - captLocal
-      - caseOrder
-      - defaultCaseOrder
-      - dupArg
-      - dupBranchBody
-      - dupCase
-      - dupSubExpr
-      - elseif
-      - emptyFallthrough
-      - emptyStringTest
-      - equalFold
-      - exitAfterDefer
-      - flagName
-      - hexLiteral
-      - indexAlloc
-      - nilValReturn
-      - offBy1
-      - regexpMust
-      - sloppyLen
-      - switchTrue
-      - wrapperFunc
-      - yodaStyleExpr
+version: "2"
 
 linters:
-  enable-all: false
-  disable-all: true
   enable:
+    - asasalint
+    - asciicheck
+    - bidichk
     - bodyclose
-    - dogsled
+    - canonicalheader
+    - copyloopvar
+    - cyclop
     - dupl
+    - durationcheck
+    - errcheck
+    - errname
+    - errorlint
+    - exhaustive
+    - exptostd
+    - fatcontext
+    #- forbidigo
+    - funcorder
+    - funlen
+    - gocheckcompilerdirectives
+    - gochecknoinits
+    - gochecksumtype
+    - gocognit
     - goconst
-    - gofmt
-    - goimports
-    - gosimple
     - gocritic
+    - gocyclo
+    - goprintffuncname
     - govet
+    - iface
     - ineffassign
+    - intrange
+    - loggercheck
+    - makezero
+    - mirror
+    - nestif
+    - nilerr
+    - nilnesserr
+    - noctx
+    - nosprintfhostport
+    - perfsprint
+    - predeclared
+    - promlinter
+    - protogetter
+    - recvcheck
+    - rowserrcheck
+    - sloglint
+    - spancheck
+    - sqlclosecheck
     - staticcheck
-    - typecheck
+    - testableexamples
+    - testifylint
+    - tparallel
     - unconvert
+    - unparam
     - unused
+    - usestdlibvars
+    - usetesting
+    - wastedassign
+    - whitespace
+    - decorder
+    - ginkgolinter
+    - goheader
+    - inamedparam
+    - interfacebloat
+    - prealloc
+    - zerologlint
+  settings:
+    cyclop:
+      max-complexity: 30
+      package-average: 10.0
+
+    errcheck:
+      check-type-assertions: true
+
+    exhaustive:
+      check:
+        - switch
+        - map
+
+    funcorder:
+      struct-method: false
+
+    funlen:
+      lines: 100
+      statements: 50
+
+    gochecksumtype:
+      default-signifies-exhaustive: false
+
+    gocognit:
+      min-complexity: 32
+
+    gocritic:
+      settings:
+        captLocal:
+          paramsOnly: false
+        underef:
+          skipRecvDeref: false
+
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+      settings:
+        shadow:
+          strict: false
+
+    inamedparam:
+      skip-single-param: true
+
+    nakedret:
+      max-func-lines: 0
+
+    perfsprint:
+      strconcat: false
+
+    staticcheck:
+      checks:
+        - all
+        - -ST1000
+        - -ST1016
+        - -QF1008
+
+    usetesting:
+      os-temp-dir: true
+
+  exclusions:
+    warn-unused: false
+    presets:
+      - std-error-handling
+      - common-false-positives
+    rules:
+      - source: 'TODO'
+        linters: [ godot ]
+      - path: '_test\.go'
+        linters:
+          - bodyclose
+          - dupl
+          - errcheck
+          - funlen
+          - goconst
+          - noctx
+
+formatters:
+  enable:
+    - gci
+  settings:
+    gci:
+      sections:
+        - standard
+        - localmodule
+        - default
+      no-inline-comments: true
+      no-prefix-comments: true
+      custom-order: true
+      no-lex-order: true

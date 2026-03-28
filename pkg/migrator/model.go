@@ -42,14 +42,6 @@ type Migration struct {
 	Transactional bool
 }
 
-func (m *Migration) ToDB() *PgMigration {
-	return &PgMigration{
-		Filename:      m.Filename,
-		Transactional: m.Transactional,
-		Md5sum:        m.Md5Sum,
-	}
-}
-
 func NewMigration(rootDir, filename string) (Migration, error) {
 	f, err := os.ReadFile(filepath.Join(rootDir, filename))
 	if err != nil {
@@ -64,6 +56,14 @@ func NewMigration(rootDir, filename string) (Migration, error) {
 	}
 
 	return m, nil
+}
+
+func (m *Migration) ToDB() *PgMigration {
+	return &PgMigration{
+		Filename:      m.Filename,
+		Transactional: m.Transactional,
+		Md5sum:        m.Md5Sum,
+	}
 }
 
 type Migrations []Migration
