@@ -176,7 +176,7 @@ func finishTxOnErr(tx *pg.Tx, err error) error {
 	}
 
 	if er != nil {
-		err = fmt.Errorf("failed to finish transation er=%v: %w", er, err)
+		err = fmt.Errorf("failed to finish transaction er=%w: %w", er, err)
 	}
 
 	return err
@@ -350,7 +350,7 @@ func (m *Migrator) skipMigrations(ctx context.Context, mm Migrations, chCurrentF
 
 func alwaysRollbackTx(tx *pg.Tx, err error) error {
 	if er := tx.Rollback(); er != nil {
-		err = fmt.Errorf("failed to finish transation er=%v: %w", er, err)
+		err = fmt.Errorf("failed to finish transation er=%w: %w", er, err)
 	}
 
 	return err
@@ -429,7 +429,7 @@ func (m *Migrator) Redo(ctx context.Context, chCurrentFile chan string) (*PgMigr
 	var pm PgMigration
 	if err := m.db.ModelContext(ctx, &pm).Order(`id desc`).Limit(1).Select(); err != nil {
 		if errors.Is(err, pg.ErrNoRows) {
-			return nil, fmt.Errorf(`applied migrations were not found`)
+			return nil, errors.New(`applied migrations were not found`)
 		}
 		return nil, fmt.Errorf(`fetch last migration failed: %w`, err)
 	}

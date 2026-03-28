@@ -11,13 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/vmkteam/pgmigrator/pkg/migrator"
+
 	"github.com/BurntSushi/toml"
 	"github.com/fatih/color"
 	"github.com/go-pg/pg/v10"
 	"github.com/rodaine/table"
 	"github.com/spf13/cobra"
-
-	"github.com/vmkteam/pgmigrator/pkg/migrator"
 )
 
 const (

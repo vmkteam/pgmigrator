@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	testDb       *pg.DB
+	testDB       *pg.DB
 	testConfig   Config
 	testMigrator *Migrator
 	dbConn       = env("DB_CONN", "postgres://postgres:postgres@localhost:5432/pgmigrator?sslmode=disable")
@@ -33,9 +33,9 @@ func NewTestDB() *pg.DB {
 }
 
 func TestMain(m *testing.M) {
-	testDb = NewTestDB()
+	testDB = NewTestDB()
 	testConfig = NewDefaultConfig()
-	testMigrator = NewMigrator(testDb, testConfig, "testdata")
+	testMigrator = NewMigrator(testDB, testConfig, "testdata")
 	os.Exit(m.Run())
 }
 
@@ -115,7 +115,6 @@ func TestNewMigration(t *testing.T) {
 			Transactional: true,
 		})
 	})
-
 }
 
 func TestMigrator_prepareMigrationsToRun(t *testing.T) {
@@ -275,7 +274,7 @@ func TestMigrator_Redo(t *testing.T) {
 			err = execRun(ctx, t)
 			So(err, ShouldBeNil)
 
-			_, err = testDb.Exec("DROP TABLE tags CASCADE;")
+			_, err = testDB.Exec("DROP TABLE tags CASCADE;")
 			So(err, ShouldBeNil)
 
 			ch := make(chan string)
@@ -500,6 +499,6 @@ func readFromCh(ch chan string, t *testing.T) {
 }
 
 func recreateSchema() error {
-	_, err := testDb.Exec("DROP SCHEMA public CASCADE; CREATE SCHEMA PUBLIC;")
+	_, err := testDB.Exec("DROP SCHEMA public CASCADE; CREATE SCHEMA PUBLIC;")
 	return err
 }
